@@ -1,0 +1,172 @@
+# =============================================================================
+# LeafMind — .gitignore
+# AI-Powered Multi-Agent Crop Leaf Disease Detection
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda/
+conda-env/
+
+# ---------------------------------------------------------------------------
+# Jupyter Notebooks
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
+*.ipynb
+
+# ---------------------------------------------------------------------------
+# Machine Learning / Deep Learning
+# ---------------------------------------------------------------------------
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.pkl
+*.pickle
+*.joblib
+
+# Training artifacts
+runs/
+outputs/
+checkpoints/
+logs/
+wandb/
+mlruns/
+lightning_logs/
+tensorboard_logs/
+.neptune/
+
+# ---------------------------------------------------------------------------
+# Dataset — Large binary files (keep YAMLs & CSVs that describe structure)
+# ---------------------------------------------------------------------------
+# Uncomment the lines below if you want to exclude raw image/label data:
+# Dataset/images/
+# Dataset/labels/
+# Dataset_2/Train/
+# Dataset_2/Val/
+# Dataset_2/Test_ID/
+# Dataset_2/Test_OOD/
+# Dataset_2/Few_Shot/
+
+# Generic image formats inside the project (excluding docs/bbox_samples if needed)
+# *.jpg
+# *.jpeg
+# *.png
+# *.bmp
+# *.tiff
+# *.webp
+
+# ---------------------------------------------------------------------------
+# Docs — Generated / large binary artefacts
+# ---------------------------------------------------------------------------
+# Raw audit JSON (large, auto-generated — re-generate from scripts)
+docs/image_audit_raw.json
+
+# Bounding-box sample images (generated output)
+docs/bbox_samples/
+
+# ---------------------------------------------------------------------------
+# Office / Presentation files (large binaries — store in cloud/LFS instead)
+# ---------------------------------------------------------------------------
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.xlsx
+*.xls
+*.pdf
+
+# ---------------------------------------------------------------------------
+# OS generated files
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# IDE / Editor
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*.bak
+*.orig
+
+# ---------------------------------------------------------------------------
+# Environment & Secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+config/secrets/
+
+# ---------------------------------------------------------------------------
+# Miscellaneous
+# ---------------------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+
+# LeafMind-specific
+Dataset/
+Dataset_2/
+data/
+vector_db/
+*.db
+*.sqlite
+*.sqlite3

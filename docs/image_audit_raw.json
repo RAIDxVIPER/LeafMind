@@ -1,0 +1,1254 @@
+{
+  "splits_summary": {
+    "D1_train": {
+      "name": "D1_train",
+      "total": 2335,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 115,
+      "width_max": 6000,
+      "width_mean": 1068.7,
+      "height_min": 85,
+      "height_max": 6000,
+      "height_mean": 906.9,
+      "mode_dist": {
+        "RGB": 2325,
+        "CMYK": 5,
+        "RGBA": 4,
+        "L": 1
+      },
+      "exact_dup_groups": 1,
+      "exact_dup_files": 2,
+      "exact_dups_detail": {
+        "33eb423bdbbc3a6ce8941be10a278a72": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_01472.jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_02064.jpg"
+        ]
+      }
+    },
+    "D1_val": {
+      "name": "D1_val",
+      "total": 236,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 115,
+      "width_max": 6000,
+      "width_mean": 1054.6,
+      "height_min": 69,
+      "height_max": 5312,
+      "height_mean": 949.7,
+      "mode_dist": {
+        "RGB": 236
+      },
+      "exact_dup_groups": 0,
+      "exact_dup_files": 0,
+      "exact_dups_detail": {}
+    },
+    "D2_train": {
+      "name": "D2_train",
+      "total": 27694,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 256,
+      "width_max": 256,
+      "width_mean": 256.0,
+      "height_min": 256,
+      "height_max": 256,
+      "height_mean": 256.0,
+      "mode_dist": {
+        "RGB": 27693,
+        "RGBA": 1
+      },
+      "exact_dup_groups": 11,
+      "exact_dup_files": 22,
+      "exact_dups_detail": {
+        "926f8ebcfc60d44649018c5154c8fcec": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__11beda66-01e9-4bfd-be37-c0f8646d1478___RS_HL 6271.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__13298d36-4425-437d-ae8e-c7d70e200084___RS_HL 6271.JPG"
+        ],
+        "161940bd6e73cf648974cc7213cffb8f": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__14896dc0-688d-456f-b5ec-a037695b0193___RS_HL 6268.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__c21cf428-bfc3-4710-b5d2-69d1c0e94748___RS_HL 6268.JPG"
+        ],
+        "68f05a541bf01c0fcfbc7f9445f8a147": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__1ab5e019-e5f0-4d8e-a252-94cb0aab8b0a___RS_HL 6269.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__3673d121-b5de-481c-b057-d4ee5b4959b1___RS_HL 6269.JPG"
+        ],
+        "8bbefab9461168ef9946618480d2f0ad": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__3d075f90-7002-4c45-abc0-4f35ee49aa79___RS_HL 6272.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Apple___healthy\\PV__acb21cc2-8d65-4880-a7bb-dcc1eab1564b___RS_HL 6272.JPG"
+        ],
+        "ea0a44df2e4e44c6ccacc31f067a6284": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__1af0bfe1-4bcf-4b8b-be66-5d0953eb647e___GH_HL Leaf 482.2.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__cfd491d6-4af5-4728-8f0e-0d330a07174a___GH_HL Leaf 482.2.JPG"
+        ],
+        "2e53ad1ec3f810e2ff4c83400dc69ec9": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__37203047-d8ba-43f7-b31e-d496c41c569c___GH_HL Leaf 389.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__505465db-407b-4e0a-8110-7479dad5261c___GH_HL Leaf 389.JPG"
+        ],
+        "3dab5eb1192b5c43fd3015490cf0b18f": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__37aad83b-7ff8-4b35-b3ed-fb8e0f54910b___GH_HL Leaf 342.1.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__e786ac89-29fe-47e3-b49e-b9a9ee7edd9d___GH_HL Leaf 342.1.JPG"
+        ],
+        "6e48e89e89da343b6b90ccda5b18d698": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__488feb1c-4b9f-44e7-8aa6-4103a9601f5f___GH_HL Leaf 434.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___healthy\\PV__a5de43e7-fc2f-4a14-a8e6-c0f2f94c84f1___GH_HL Leaf 434.JPG"
+        ],
+        "c1b24c8caaa06e756560a83d7358579e": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__861d8b00-57a4-46b0-b51a-09d102dbe119___GHLB_PS Leaf 24 Day 13.jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__d82b634e-9a19-497b-b698-aaf100d622a1___GHLB_PS Leaf 24 Day 13.jpg"
+        ],
+        "4bab4aa40d89e19ed72d8b8d501b1db8": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__98586693-fe1f-4ea0-8e27-4501b61cf09b___GHLB_PS Leaf 23.5 Day 13.jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__c1775bad-7c02-41fb-bb7d-f8df91d60ac3___GHLB_PS Leaf 23.5 Day 13.jpg"
+        ],
+        "5bdbdc7333be3ab35ef81ec17ce14816": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__d6e6897a-5083-4914-9903-804c5684a956___GHLB2 Leaf 102.JPG",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Train\\Tomato___Late_blight\\PV__d81682aa-746b-4e07-af2b-52ebb6f4c017___GHLB2 Leaf 102.JPG"
+        ]
+      }
+    },
+    "D2_val": {
+      "name": "D2_val",
+      "total": 5940,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 256,
+      "width_max": 256,
+      "width_mean": 256.0,
+      "height_min": 256,
+      "height_max": 256,
+      "height_mean": 256.0,
+      "mode_dist": {
+        "RGB": 5940
+      },
+      "exact_dup_groups": 0,
+      "exact_dup_files": 0,
+      "exact_dups_detail": {}
+    },
+    "D2_test_id": {
+      "name": "D2_test_id",
+      "total": 5929,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 256,
+      "width_max": 256,
+      "width_mean": 256.0,
+      "height_min": 256,
+      "height_max": 256,
+      "height_mean": 256.0,
+      "mode_dist": {
+        "RGB": 5929
+      },
+      "exact_dup_groups": 0,
+      "exact_dup_files": 0,
+      "exact_dups_detail": {}
+    },
+    "D2_test_ood": {
+      "name": "D2_test_ood",
+      "total": 2374,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 115,
+      "width_max": 6000,
+      "width_mean": 1164.0,
+      "height_min": 85,
+      "height_max": 5184,
+      "height_mean": 973.2,
+      "mode_dist": {
+        "RGB": 2365,
+        "L": 1,
+        "CMYK": 4,
+        "RGBA": 4
+      },
+      "exact_dup_groups": 6,
+      "exact_dup_files": 12,
+      "exact_dups_detail": {
+        "ba5dcc6822fe97d13578703e2988b2ce": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Blueberry___healthy\\PD__Blueberry leaf (1).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Blueberry___healthy\\PD__Blueberry leaf (49).jpg"
+        ],
+        "43ba8a87d9053032195c7c59bc01f1fc": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (1).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (121).jpg"
+        ],
+        "8edd2518767e8b140ffe3c6f3d37609d": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (12).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (7).jpg"
+        ],
+        "33eb423bdbbc3a6ce8941be10a278a72": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (14).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Late_blight\\PD__Potato leaf late blight (11).jpg"
+        ],
+        "e4aff68ead58ba22a411c93db3a630af": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (24).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Late_blight\\PD__Potato leaf late blight (4).jpg"
+        ],
+        "1fc7b6d3ecba2fe90bbf8f6078fd7e45": [
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (9).jpg",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (109).jpg"
+        ]
+      }
+    },
+    "D2_few_shot": {
+      "name": "D2_few_shot",
+      "total": 300,
+      "corrupt_count": 0,
+      "corrupt_files": [],
+      "width_min": 150,
+      "width_max": 5616,
+      "width_mean": 1182.3,
+      "height_min": 148,
+      "height_max": 6000,
+      "height_mean": 1000.3,
+      "mode_dist": {
+        "RGB": 300
+      },
+      "exact_dup_groups": 0,
+      "exact_dup_files": 0,
+      "exact_dups_detail": {}
+    }
+  },
+  "cross_split_md5_dups": {
+    "count": 2359,
+    "by_pair": {
+      "('D1_train', 'D2_test_ood')": 1972,
+      "('D1_train', 'D2_few_shot')": 238,
+      "('D1_val', 'D2_test_ood')": 103,
+      "('D1_val', 'D2_few_shot')": 25,
+      "('D1_train', 'D1_val', 'D2_test_ood')": 10,
+      "('D2_test_id', 'D2_train')": 5,
+      "('D2_train', 'D2_val')": 4,
+      "('D1_train', 'D1_val', 'D2_few_shot')": 1,
+      "('D2_test_id', 'D2_val')": 1
+    },
+    "sample_dups": {
+      "62142193717aaf8ea8dacacd8641a074": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00000.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (46).jpg"
+        ]
+      ],
+      "8ebf7af52172418de592de94a9c0c266": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00001.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Cherry___healthy\\PD__Cherry leaf (17).jpg"
+        ]
+      ],
+      "6e2fc8dadc288d7cc18d3d690376ee39": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00002.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (34).jpg"
+        ]
+      ],
+      "a0c117519521a6ad616c8168ce02d6f1": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00003.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (39).jpg"
+        ]
+      ],
+      "7958f6ddfbf706df78124e2c1abf3a28": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00004.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (58).jpg"
+        ]
+      ],
+      "39be0a3e4cd426c96b86091e24fa42c6": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00005.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (25).jpg"
+        ]
+      ],
+      "796f649cb28b7a8cf0f1e78cc0b05e9e": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00006.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (43).jpg"
+        ]
+      ],
+      "b492b4754b7277d215d31fccf22a884f": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00007.jpg"
+        ],
+        [
+          "D2_test_ood",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (12).jpg"
+        ]
+      ],
+      "440a437f921762af056b2dd613210e4c": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00008.jpg"
+        ],
+        [
+          "D2_few_shot",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (40).jpg"
+        ]
+      ],
+      "dd2a681c07dbc55ef982de1a46e2f809": [
+        [
+          "D1_train",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00009.jpg"
+        ],
+        [
+          "D2_few_shot",
+          "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Few_Shot\\Tomato___healthy\\PD__Tomato leaf (13).jpg"
+        ]
+      ]
+    }
+  },
+  "perceptual_hashing": {
+    "scope": "D1_train, D1_val, D2_test_ood, D2_few_shot",
+    "d2_pv_splits_skipped": true,
+    "threshold_hamming": 8,
+    "exact_phash_dup_groups_in_scope": 2310,
+    "cross_split_exact_phash_dups": 2310,
+    "d1_vs_d2_ood_neardup_count": 2508,
+    "d1_vs_d2_ood_neardup_sample": [
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00000.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (46).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00001.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Cherry___healthy\\PD__Cherry leaf (17).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00002.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (34).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00003.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (39).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00004.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (58).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00005.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (25).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00006.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (43).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00007.jpg",
+        "split_b": "D2_test_ood",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (12).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00008.jpg",
+        "split_b": "D2_few_shot",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (40).jpg",
+        "hamming": 0
+      },
+      {
+        "split_a": "D1_train",
+        "path_a": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset\\images\\train\\train_00009.jpg",
+        "split_b": "D2_few_shot",
+        "path_b": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2\\Few_Shot\\Tomato___healthy\\PD__Tomato leaf (13).jpg",
+        "hamming": 0
+      }
+    ],
+    "phash_errors": 0
+  },
+  "bbox_visualisation": {
+    "sample_size": 20,
+    "sample_details": [
+      {
+        "image": "train_00456.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.5248,
+        "boxes": [
+          {
+            "cid": 24,
+            "name": "Bell_pepper leaf spot",
+            "bbox_w_frac": 0.7267,
+            "bbox_h_frac": 0.7222,
+            "area_frac": 0.5248
+          }
+        ]
+      },
+      {
+        "image": "train_00102.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.7289,
+        "boxes": [
+          {
+            "cid": 2,
+            "name": "Corn leaf blight",
+            "bbox_w_frac": 0.985,
+            "bbox_h_frac": 0.74,
+            "area_frac": 0.7289
+          }
+        ]
+      },
+      {
+        "image": "train_01126.jpg",
+        "num_boxes": 2,
+        "avg_box_area_frac": 0.3903,
+        "boxes": [
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.6348,
+            "bbox_h_frac": 0.8558,
+            "area_frac": 0.5433
+          },
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.4283,
+            "bbox_h_frac": 0.5543,
+            "area_frac": 0.2374
+          }
+        ]
+      },
+      {
+        "image": "train_01003.jpg",
+        "num_boxes": 12,
+        "avg_box_area_frac": 0.0115,
+        "boxes": [
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0787,
+            "bbox_h_frac": 0.1546,
+            "area_frac": 0.0122
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0984,
+            "bbox_h_frac": 0.0965,
+            "area_frac": 0.0095
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.065,
+            "bbox_h_frac": 0.1418,
+            "area_frac": 0.0092
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0779,
+            "bbox_h_frac": 0.1634,
+            "area_frac": 0.0127
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.1483,
+            "bbox_h_frac": 0.0855,
+            "area_frac": 0.0127
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.1294,
+            "bbox_h_frac": 0.0822,
+            "area_frac": 0.0106
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0883,
+            "bbox_h_frac": 0.1188,
+            "area_frac": 0.0105
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0581,
+            "bbox_h_frac": 0.1213,
+            "area_frac": 0.0071
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0891,
+            "bbox_h_frac": 0.1239,
+            "area_frac": 0.011
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0696,
+            "bbox_h_frac": 0.1298,
+            "area_frac": 0.009
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.0776,
+            "bbox_h_frac": 0.144,
+            "area_frac": 0.0112
+          },
+          {
+            "cid": 15,
+            "name": "Tomato leaf bacterial spot",
+            "bbox_w_frac": 0.1187,
+            "bbox_h_frac": 0.1882,
+            "area_frac": 0.0223
+          }
+        ]
+      },
+      {
+        "image": "train_00914.jpg",
+        "num_boxes": 3,
+        "avg_box_area_frac": 0.115,
+        "boxes": [
+          {
+            "cid": 5,
+            "name": "Strawberry leaf",
+            "bbox_w_frac": 0.3386,
+            "bbox_h_frac": 0.3873,
+            "area_frac": 0.1311
+          },
+          {
+            "cid": 5,
+            "name": "Strawberry leaf",
+            "bbox_w_frac": 0.2472,
+            "bbox_h_frac": 0.4259,
+            "area_frac": 0.1053
+          },
+          {
+            "cid": 5,
+            "name": "Strawberry leaf",
+            "bbox_w_frac": 0.3451,
+            "bbox_h_frac": 0.3144,
+            "area_frac": 0.1085
+          }
+        ]
+      },
+      {
+        "image": "train_00571.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.6706,
+        "boxes": [
+          {
+            "cid": 3,
+            "name": "Apple rust leaf",
+            "bbox_w_frac": 0.7525,
+            "bbox_h_frac": 0.8911,
+            "area_frac": 0.6706
+          }
+        ]
+      },
+      {
+        "image": "train_00419.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.1901,
+        "boxes": [
+          {
+            "cid": 2,
+            "name": "Corn leaf blight",
+            "bbox_w_frac": 0.1907,
+            "bbox_h_frac": 0.9971,
+            "area_frac": 0.1901
+          }
+        ]
+      },
+      {
+        "image": "train_02233.jpg",
+        "num_boxes": 10,
+        "avg_box_area_frac": 0.0374,
+        "boxes": [
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.136,
+            "bbox_h_frac": 0.274,
+            "area_frac": 0.0373
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.13,
+            "bbox_h_frac": 0.138,
+            "area_frac": 0.0179
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.18,
+            "bbox_h_frac": 0.1,
+            "area_frac": 0.018
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.126,
+            "bbox_h_frac": 0.106,
+            "area_frac": 0.0134
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.154,
+            "bbox_h_frac": 0.29,
+            "area_frac": 0.0447
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.26,
+            "bbox_h_frac": 0.19,
+            "area_frac": 0.0494
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.204,
+            "bbox_h_frac": 0.118,
+            "area_frac": 0.0241
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.146,
+            "bbox_h_frac": 0.182,
+            "area_frac": 0.0266
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.298,
+            "bbox_h_frac": 0.234,
+            "area_frac": 0.0697
+          },
+          {
+            "cid": 13,
+            "name": "Tomato leaf mosaic virus",
+            "bbox_w_frac": 0.304,
+            "bbox_h_frac": 0.24,
+            "area_frac": 0.073
+          }
+        ]
+      },
+      {
+        "image": "train_00356.jpg",
+        "num_boxes": 3,
+        "avg_box_area_frac": 0.1739,
+        "boxes": [
+          {
+            "cid": 21,
+            "name": "Tomato Septoria leaf spot",
+            "bbox_w_frac": 0.2678,
+            "bbox_h_frac": 0.4217,
+            "area_frac": 0.1129
+          },
+          {
+            "cid": 21,
+            "name": "Tomato Septoria leaf spot",
+            "bbox_w_frac": 0.5661,
+            "bbox_h_frac": 0.6114,
+            "area_frac": 0.3461
+          },
+          {
+            "cid": 21,
+            "name": "Tomato Septoria leaf spot",
+            "bbox_w_frac": 0.1508,
+            "bbox_h_frac": 0.4157,
+            "area_frac": 0.0627
+          }
+        ]
+      },
+      {
+        "image": "train_01728.jpg",
+        "num_boxes": 7,
+        "avg_box_area_frac": 0.0675,
+        "boxes": [
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.0775,
+            "bbox_h_frac": 0.2711,
+            "area_frac": 0.021
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.1925,
+            "bbox_h_frac": 0.4533,
+            "area_frac": 0.0873
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.1108,
+            "bbox_h_frac": 0.1867,
+            "area_frac": 0.0207
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.1583,
+            "bbox_h_frac": 0.5333,
+            "area_frac": 0.0844
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.2592,
+            "bbox_h_frac": 0.2711,
+            "area_frac": 0.0703
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.3633,
+            "bbox_h_frac": 0.21,
+            "area_frac": 0.0763
+          },
+          {
+            "cid": 7,
+            "name": "Tomato leaf late blight",
+            "bbox_w_frac": 0.36,
+            "bbox_h_frac": 0.3133,
+            "area_frac": 0.1128
+          }
+        ]
+      },
+      {
+        "image": "train_00130.jpg",
+        "num_boxes": 3,
+        "avg_box_area_frac": 0.3025,
+        "boxes": [
+          {
+            "cid": 18,
+            "name": "Corn Gray leaf spot",
+            "bbox_w_frac": 0.9984,
+            "bbox_h_frac": 0.455,
+            "area_frac": 0.4542
+          },
+          {
+            "cid": 18,
+            "name": "Corn Gray leaf spot",
+            "bbox_w_frac": 0.7937,
+            "bbox_h_frac": 0.2771,
+            "area_frac": 0.2199
+          },
+          {
+            "cid": 18,
+            "name": "Corn Gray leaf spot",
+            "bbox_w_frac": 0.5079,
+            "bbox_h_frac": 0.4596,
+            "area_frac": 0.2334
+          }
+        ]
+      },
+      {
+        "image": "train_00122.jpg",
+        "num_boxes": 5,
+        "avg_box_area_frac": 0.0802,
+        "boxes": [
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.2737,
+            "bbox_h_frac": 0.5169,
+            "area_frac": 0.1415
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.2662,
+            "bbox_h_frac": 0.3947,
+            "area_frac": 0.1051
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.175,
+            "bbox_h_frac": 0.2726,
+            "area_frac": 0.0477
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.2338,
+            "bbox_h_frac": 0.1447,
+            "area_frac": 0.0338
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.1888,
+            "bbox_h_frac": 0.3853,
+            "area_frac": 0.0727
+          }
+        ]
+      },
+      {
+        "image": "train_00383.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.3807,
+        "boxes": [
+          {
+            "cid": 10,
+            "name": "Apple leaf",
+            "bbox_w_frac": 0.7085,
+            "bbox_h_frac": 0.5374,
+            "area_frac": 0.3807
+          }
+        ]
+      },
+      {
+        "image": "train_00895.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.9308,
+        "boxes": [
+          {
+            "cid": 16,
+            "name": "Squash Powdery mildew",
+            "bbox_w_frac": 0.9867,
+            "bbox_h_frac": 0.9433,
+            "area_frac": 0.9308
+          }
+        ]
+      },
+      {
+        "image": "train_00952.jpg",
+        "num_boxes": 22,
+        "avg_box_area_frac": 0.0048,
+        "boxes": [
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.064,
+            "bbox_h_frac": 0.108,
+            "area_frac": 0.0069
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.056,
+            "bbox_h_frac": 0.112,
+            "area_frac": 0.0063
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.064,
+            "bbox_h_frac": 0.114,
+            "area_frac": 0.0073
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.04,
+            "bbox_h_frac": 0.08,
+            "area_frac": 0.0032
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.046,
+            "bbox_h_frac": 0.112,
+            "area_frac": 0.0052
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.05,
+            "bbox_h_frac": 0.112,
+            "area_frac": 0.0056
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.044,
+            "bbox_h_frac": 0.092,
+            "area_frac": 0.004
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.09,
+            "bbox_h_frac": 0.046,
+            "area_frac": 0.0041
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.082,
+            "bbox_h_frac": 0.08,
+            "area_frac": 0.0066
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.058,
+            "bbox_h_frac": 0.072,
+            "area_frac": 0.0042
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.056,
+            "bbox_h_frac": 0.068,
+            "area_frac": 0.0038
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.036,
+            "bbox_h_frac": 0.068,
+            "area_frac": 0.0024
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.04,
+            "bbox_h_frac": 0.11,
+            "area_frac": 0.0044
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.07,
+            "bbox_h_frac": 0.098,
+            "area_frac": 0.0069
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.054,
+            "bbox_h_frac": 0.074,
+            "area_frac": 0.004
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.044,
+            "bbox_h_frac": 0.092,
+            "area_frac": 0.004
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.048,
+            "bbox_h_frac": 0.076,
+            "area_frac": 0.0036
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.052,
+            "bbox_h_frac": 0.068,
+            "area_frac": 0.0035
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.064,
+            "bbox_h_frac": 0.066,
+            "area_frac": 0.0042
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.054,
+            "bbox_h_frac": 0.072,
+            "area_frac": 0.0039
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.09,
+            "bbox_h_frac": 0.062,
+            "area_frac": 0.0056
+          },
+          {
+            "cid": 1,
+            "name": "Peach leaf",
+            "bbox_w_frac": 0.106,
+            "bbox_h_frac": 0.05,
+            "area_frac": 0.0053
+          }
+        ]
+      },
+      {
+        "image": "train_02069.jpg",
+        "num_boxes": 4,
+        "avg_box_area_frac": 0.1154,
+        "boxes": [
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.3857,
+            "bbox_h_frac": 0.4381,
+            "area_frac": 0.169
+          },
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.3369,
+            "bbox_h_frac": 0.4897,
+            "area_frac": 0.165
+          },
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.2373,
+            "bbox_h_frac": 0.3673,
+            "area_frac": 0.0872
+          },
+          {
+            "cid": 17,
+            "name": "grape leaf",
+            "bbox_w_frac": 0.0996,
+            "bbox_h_frac": 0.4056,
+            "area_frac": 0.0404
+          }
+        ]
+      },
+      {
+        "image": "train_00108.jpg",
+        "num_boxes": 5,
+        "avg_box_area_frac": 0.0841,
+        "boxes": [
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.297,
+            "bbox_h_frac": 0.3933,
+            "area_frac": 0.1168
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.266,
+            "bbox_h_frac": 0.2799,
+            "area_frac": 0.0744
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.33,
+            "bbox_h_frac": 0.2899,
+            "area_frac": 0.0957
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.182,
+            "bbox_h_frac": 0.2765,
+            "area_frac": 0.0503
+          },
+          {
+            "cid": 14,
+            "name": "Raspberry leaf",
+            "bbox_w_frac": 0.37,
+            "bbox_h_frac": 0.2255,
+            "area_frac": 0.0834
+          }
+        ]
+      },
+      {
+        "image": "train_02298.jpg",
+        "num_boxes": 8,
+        "avg_box_area_frac": 0.0702,
+        "boxes": [
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.22,
+            "bbox_h_frac": 0.4757,
+            "area_frac": 0.1046
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.205,
+            "bbox_h_frac": 0.4532,
+            "area_frac": 0.0929
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.1975,
+            "bbox_h_frac": 0.2247,
+            "area_frac": 0.0444
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.14,
+            "bbox_h_frac": 0.1948,
+            "area_frac": 0.0273
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.1375,
+            "bbox_h_frac": 0.1648,
+            "area_frac": 0.0227
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.2675,
+            "bbox_h_frac": 0.4307,
+            "area_frac": 0.1152
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.2575,
+            "bbox_h_frac": 0.3184,
+            "area_frac": 0.082
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.235,
+            "bbox_h_frac": 0.3071,
+            "area_frac": 0.0722
+          }
+        ]
+      },
+      {
+        "image": "train_00814.jpg",
+        "num_boxes": 1,
+        "avg_box_area_frac": 0.9982,
+        "boxes": [
+          {
+            "cid": 6,
+            "name": "Corn rust leaf",
+            "bbox_w_frac": 0.9992,
+            "bbox_h_frac": 0.999,
+            "area_frac": 0.9982
+          }
+        ]
+      },
+      {
+        "image": "train_02232.jpg",
+        "num_boxes": 7,
+        "avg_box_area_frac": 0.0921,
+        "boxes": [
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.5098,
+            "bbox_h_frac": 0.5599,
+            "area_frac": 0.2854
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.2578,
+            "bbox_h_frac": 0.237,
+            "area_frac": 0.0611
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.376,
+            "bbox_h_frac": 0.2839,
+            "area_frac": 0.1067
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.1025,
+            "bbox_h_frac": 0.0846,
+            "area_frac": 0.0087
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.3184,
+            "bbox_h_frac": 0.3385,
+            "area_frac": 0.1078
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.2598,
+            "bbox_h_frac": 0.2227,
+            "area_frac": 0.0578
+          },
+          {
+            "cid": 9,
+            "name": "Potato leaf early blight",
+            "bbox_w_frac": 0.0898,
+            "bbox_h_frac": 0.1927,
+            "area_frac": 0.0173
+          }
+        ]
+      }
+    ],
+    "aggregate_all_train_labels": {
+      "total_annotations": 8444,
+      "area_frac_min": 0.00011,
+      "area_frac_p10": 0.01235,
+      "area_frac_p25": 0.02717,
+      "area_frac_p50": 0.06397,
+      "area_frac_p75": 0.15497,
+      "area_frac_p90": 0.44161,
+      "area_frac_p95": 0.72023,
+      "area_frac_max": 0.99909,
+      "area_frac_mean": 0.14887,
+      "pct_boxes_gt50pct_image": 0.0869,
+      "pct_boxes_gt25pct_image": 0.163
+    }
+  }
+}
