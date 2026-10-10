@@ -1,0 +1,51 @@
+# LeafMind — Python Dependencies
+# See docs/spec/part6_build_spec.md §6d-ii for package rationale.
+# Pin major versions where noted. Use latest stable otherwise.
+#
+# Install: pip install -r requirements.txt
+
+# ── Core runtime ────────────────────────────────────────────────────────────────
+python-dotenv           # Load .env in development — R11
+
+# ── ML framework ────────────────────────────────────────────────────────────────
+torch                   # ML framework for classifier and detector
+torchvision             # Image transforms and pretrained model support
+timm                    # EfficientNet-B3 pretrained weights and fine-tuning (C2)
+ultralytics             # YOLOv8s training and inference (C2, optional detector)
+
+# ── Image processing ────────────────────────────────────────────────────────────
+Pillow                  # Image decoding, mode conversion, quality checks
+imagehash               # Perceptual hashing for duplicate detection (C1, scripts)
+
+# ── Orchestration ───────────────────────────────────────────────────────────────
+langgraph               # Orchestrator state graph, checkpointing, conditional edges (C7)
+
+# ── Data validation ─────────────────────────────────────────────────────────────
+pydantic>=2.0,<3.0      # All agent message schemas — pin major v2 (R6)
+
+# ── API server ──────────────────────────────────────────────────────────────────
+fastapi                 # Async HTTP API (C9)
+uvicorn[standard]       # ASGI server (C9)
+python-multipart        # Multipart form data (image upload)
+
+# ── UI ───────────────────────────────────────────────────────────────────────────
+streamlit               # Phase 1 demo UI (C9)
+
+# ── RAG pipeline ────────────────────────────────────────────────────────────────
+sentence-transformers   # Embedding (all-MiniLM-L6-v2) + reranking (ms-marco-MiniLM-L-6-v2) (C3)
+chromadb                # Vector DB (Phase 1; embedded, no server) (C3)
+
+# ── LLM providers ───────────────────────────────────────────────────────────────
+google-generativeai     # Gemini LLM access (when LLM_PROVIDER=gemini) (C6)
+ollama                  # Ollama LLM access (when LLM_PROVIDER=ollama) (C6)
+
+# ── Weather / HTTP ──────────────────────────────────────────────────────────────
+httpx                   # Async HTTP client for weather API (C4)
+
+# ── Testing ─────────────────────────────────────────────────────────────────────
+pytest
+pytest-asyncio
+
+# ── Utilities ───────────────────────────────────────────────────────────────────
+tqdm                    # Progress bars for scripts
+numpy                   # Numerical operations

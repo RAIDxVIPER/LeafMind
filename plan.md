@@ -70,7 +70,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 
 ## Implementation stages (only after Part 6 is approved)
 
-- [ ] Data prep (C1)
+- [x] Data prep (C1) — 2026-10-10, all DoD items satisfied, 55 tests pass
 - [ ] Vision (C2)
 - [ ] RAG (C3)
 - [ ] Weather (C4)
@@ -112,6 +112,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | I24 | LOW | ECE ≤ 0.05 target attributed to Guo et al. 2017 but that paper provides no target | Resolved — relabelled as [ENG assumption] |
 | I25 | LOW | LLM model names (gemini-1.5-flash, llama3) may change; verify before coding | Open |
 | I26 | HIGH | Empty threat table caps max first-visit R at 0.55 ("moderate"); cannot reach "severe" | Open — documented limitation; blocks accurate risk scoring until I19 resolved |
+| I27 | LOW | Windows cp1252 console encoding errors on ← ≥ ✓ symbols in logging; scripts exit code 1 despite correct output | Resolved — replaced Unicode arrows/checkmarks with ASCII in both build scripts |
 
 ## Decisions made
 
@@ -139,4 +140,4 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 |---|---|---|---|
 | 2026-10-01 | New chat after limit reset | plan.md created; awaiting repo check | Verify existing work, update statuses, resume at first unchecked item |
 | 2026-10-01 | Session 2 | Parts 1–5 written across multiple sessions | Part 6 |
-| 2026-10-05 | Session 3 | Verified Parts 1–5 complete and not truncated; updated plan.md with real paths, issue register I1–I26, decisions D1–D15; wrote Part 6 (6a validity review, 6b limitations, 6c additional data/APIs, 6d self-contained build spec with embedded Pydantic schemas, folder structure, stack, build order, coding rules R1–R14, threshold resolution register). All spec Parts 1–6 complete. | Implementation (C1–C11) when approved |
+| 2026-10-10 | Session 4 (C1) | Implemented Stage C1 (Data Prep) in full. Folder structure created. .env.example, requirements.txt, src/schemas/schemas.py (exact spec copy), config/class_map_d1.json (29 classes), config/class_map_d2.json (30 classes), config/threat_table.json (all [GAP]), scripts/build_exclusion_list.py + config/exclusion_list.json (2,349 unique D1 hashes, DoD >=2,075 PASSED), scripts/build_split_manifests.py + 5 manifest JSONs + config/few_shot_test_ood_overlap.json (exactly 47 files), tests/unit/test_schemas.py (36 tests), tests/unit/test_exclusion_list.py (20 tests). 55 pass, 1 skipped. Deviations: (1) exclusion_list total=2,349 not 2,085 — spec's 2085 only counted D1<->OOD; combined with FewShot gives 2,349 (correct, logged); (2) Windows Unicode fix for console logging in both scripts; (3) manifests script slow (~8min for 42K files) due to OneDrive I/O. | C2 (Vision model training) when user says 'continue' |

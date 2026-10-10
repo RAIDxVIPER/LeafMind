@@ -1,0 +1,163 @@
+{
+  "_note": "Disease threat tier for risk scoring. All entries are [GAP] \u2014 a plant pathologist must assign tiers before non-fallback risk scoring is possible. See plan.md I19. Until filled, scorer.py uses DISEASE_DETECTED fallback (0.50). Valid tiers: HEALTHY | LOW | MEDIUM | HIGH | DISEASE_DETECTED",
+  "_tier_scores": {
+    "HEALTHY": 0.0,
+    "LOW": 0.25,
+    "MEDIUM": 0.5,
+    "HIGH": 0.85,
+    "DISEASE_DETECTED": 0.5
+  },
+  "_tier_scores_note": "[ENG assumption] \u2014 all values to be calibrated by plant pathologist.",
+  "classes": {
+    "Apple___Apple_scab": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Apple___Cedar_apple_rust": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Apple___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Blueberry___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Cherry___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Corn_(maize)___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Corn___Cercospora_leaf_spot": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Corn___Common_rust": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Corn___Northern_Leaf_Blight": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Grape___Black_rot": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Grape___Esca_(Black_Measles)": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Grape___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Peach___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Pepper,_bell___Bacterial_spot": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Pepper,_bell___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Potato___Early_blight": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Potato___Late_blight": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Potato___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Raspberry___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Soybean___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Squash___Powdery_mildew": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Strawberry___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Bacterial_spot": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Early_blight": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Late_blight": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Leaf_Mold": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Septoria_leaf_spot": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___Tomato_mosaic_virus": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    },
+    "Tomato___healthy": {
+      "tier": "DISEASE_DETECTED",
+      "status": "[GAP]",
+      "notes": "Pathologist review required. Fallback tier used."
+    }
+  }
+}

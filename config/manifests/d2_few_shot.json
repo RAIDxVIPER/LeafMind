@@ -1,0 +1,1513 @@
+{
+  "_meta": {
+    "split": "Few_Shot",
+    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
+    "image_count": 300,
+    "notes": [
+      "No within-split dups found in audit. Full list."
+    ],
+    "generated_by": "scripts/build_split_manifests.py"
+  },
+  "images": [
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (3).jpg",
+      "md5": "1e88a339345416070a8c786f0257af3b",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (4).jpg",
+      "md5": "718bad330e794e94b7754e66ebe26192",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (49).jpg",
+      "md5": "bb150cc5107b831cae973084287b49f0",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (52).jpg",
+      "md5": "145ba1254e0511af3c138d28cfac693f",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (54).jpg",
+      "md5": "1600ba2cd73260d2d1485a55e83d6334",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (55).jpg",
+      "md5": "66f3a1e0d23eba69c449acc7545030d4",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (69).jpg",
+      "md5": "d4f4a2a52a97b0d6f39f50664513a815",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (73).jpg",
+      "md5": "63f5f98428313de43944f6d2e81f4d77",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (77).jpg",
+      "md5": "f339688fafe70b3ebbf9bdb721c6cb73",
+      "class": "Apple___Apple_scab"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (13).jpg",
+      "md5": "92cce107e3c8d69300adf7a50ca17403",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (30).jpg",
+      "md5": "5a2d3dc5d37af35f7bebcb33c0f45b86",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (33).jpg",
+      "md5": "e9018ec666b212a0f7c0ca4c2eb16011",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (42).jpg",
+      "md5": "38a43572e51b9e38223095bb9bf64c3e",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (44).jpg",
+      "md5": "406080e46021058e69a59be98c75a0fa",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (48).jpg",
+      "md5": "31f8761e6393d6989ee0449c004184a8",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (63).jpg",
+      "md5": "58287aa64361e2e2d91465837ae9d720",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (79).jpg",
+      "md5": "988934f9729499a7f1d11850ceed7d4c",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (9).jpg",
+      "md5": "e46d49ae32c702aec448a20ec5c4de0f",
+      "class": "Apple___Cedar_apple_rust"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (12).jpg",
+      "md5": "d0ac0a385c90566fb18107affadb8d67",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (2).jpg",
+      "md5": "aff08976469bd8e9261c32593eaf294f",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (23).jpg",
+      "md5": "e6f2c120f787f5c90ca2105d2ff416e6",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (28).jpg",
+      "md5": "069b50caf79511797ba07bace1a347ab",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (31).jpg",
+      "md5": "ffdc6aaa5d573b3e7ef742db707f71bf",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (38).jpg",
+      "md5": "fffb8ca727572d974ffae8fd46a8647a",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (42).jpg",
+      "md5": "3eddf8d835316362adcd9dd783795e98",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (58).jpg",
+      "md5": "2d59d5288ce8c12ea14a92ad46ce5760",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (67).jpg",
+      "md5": "b98da111e897e97bec2495e61beef27f",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (9).jpg",
+      "md5": "6ce2e8a87ea97ecf40e9da20a0242b75",
+      "class": "Apple___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (101).jpg",
+      "md5": "f64a5c97aff16a9d182fd2f1002541ea",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (22).jpg",
+      "md5": "3193dd48dbf197caf4e26a6e7a485ac4",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (34).jpg",
+      "md5": "265f5aceb3d29280929222b7810a2b79",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (36).jpg",
+      "md5": "084f29a2db2fe81ed9af2dabef06bdbd",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (38).jpg",
+      "md5": "b3ef7bd4b7d3e5a41f7a2be04607ba7e",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (42).jpg",
+      "md5": "24ca4ec7e41d22bc89dd9b954b97a9f4",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (52).jpg",
+      "md5": "32093c56dec834ce866c6927335b8106",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (54).jpg",
+      "md5": "99adbea627b2dec290b55e5ed04efb49",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (62).jpg",
+      "md5": "fc1e3202cfc877648ae55cadc13b0a8e",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (72).jpg",
+      "md5": "099cb130053012545debe9e025b86f1c",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (82).jpg",
+      "md5": "f8835eab76ca1df0e245fae52127cc30",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Blueberry___healthy\\PD__Blueberry leaf (94).jpg",
+      "md5": "636ed53b800e68c0b6ab1f65f21bc585",
+      "class": "Blueberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (10).jpg",
+      "md5": "5cbc93f8380b763d7658852d46f24f04",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (22).jpg",
+      "md5": "b9736e72912e437f3ccf51e0faee6623",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (29).jpg",
+      "md5": "05de53194c87d0a00fe1510692b09496",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (4).jpg",
+      "md5": "d471265a4d58fed60e670ecbfa7942cf",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (43).jpg",
+      "md5": "9873c98774046462935e636b5cbbe893",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (46).jpg",
+      "md5": "06182c3183e5c65ad9caa36feb6c6cd4",
+      "class": "Cherry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200610_063444.jpg",
+      "md5": "48edf9aee1ea2af48811ee4ba849da5c",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200610_065115.jpg",
+      "md5": "8f4f159993ed547bdaad64022b6271b1",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200610_065148.jpg",
+      "md5": "84402cbdf0e163d74a46046c6f4d1df8",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200612_103751.jpg",
+      "md5": "eab25f2d8f6837796a1920eaa9128a14",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_084720.jpg",
+      "md5": "5af1178f568776ed11116809292b6796",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_093005.jpg",
+      "md5": "0a1cd708c577eb6c3d5a235c2db060df",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_093505.jpg",
+      "md5": "68ac5ec608a751f4df240576a68a8ded",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_095338.jpg",
+      "md5": "64e2414e1f376f11948a4ee22f041d09",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_100609.jpg",
+      "md5": "4da4491d7caef61b36a0ddb3ddd09e66",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn_(maize)___healthy\\ALT__20200727_100631.jpg",
+      "md5": "5bb7f7710778315e9517718163aacc5d",
+      "class": "Corn_(maize)___healthy"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (2).jpg",
+      "md5": "ef7aa4da5f78915b738b4da5d5d82397",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (24).jpg",
+      "md5": "cf559e9e5f4dc7698c11a30e74729227",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (3).jpg",
+      "md5": "6f5ec07592f7864db2f16b3a308415b0",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (34).jpg",
+      "md5": "57197964d7b68e165788d090358d35e1",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (38).jpg",
+      "md5": "d085ff9f65b68471b0a53e94b9e15e34",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (5).jpg",
+      "md5": "3cfdafafa472cd8a2a60b090ce4ae4dd",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (63).jpg",
+      "md5": "3b83f4912ed6a14a14f88a10d1d2e874",
+      "class": "Corn___Cercospora_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (11).jpg",
+      "md5": "85d463d32074f7c3819aa2489d9cde60",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (18).jpg",
+      "md5": "1ae7a2db2d46945b6522059cf30af542",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (2).jpg",
+      "md5": "5410d90b43374315ada1e63b6912f7b6",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (3).jpg",
+      "md5": "2328851629da2cb040135060c916078a",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (32).jpg",
+      "md5": "324fa5b85131cd34fa3700668aeff4cf",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (4).jpg",
+      "md5": "b27a8c33a93cf98e0d7d469c207405a5",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (48).jpg",
+      "md5": "d19d0da51f046567a4a15295f81da791",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (61).jpg",
+      "md5": "d77f1c780e39e027106141fb59421958",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (68).jpg",
+      "md5": "0daf9bd8f5f6dec6e86f12b284f85320",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (7).jpg",
+      "md5": "0f7a8e57ca07d5c7aa55871f5b241a9a",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (75).jpg",
+      "md5": "309be9a7359e485839e76e2d2020577b",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (97).jpg",
+      "md5": "3a3ae9158cb13f47c0e88c883c1c398a",
+      "class": "Corn___Common_rust"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (1).jpeg",
+      "md5": "c7d34163e380722eaf8ea029a559b77d",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (100).jpg",
+      "md5": "36cffe5d6bbd6ab59f4ea60ee83c6c83",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (116).jpg",
+      "md5": "6290951f3ed4c0d5a8479230023a2805",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (136).jpg",
+      "md5": "9ec9a30899606b5250df4ce9fa6d95dd",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (139).jpg",
+      "md5": "2a56108e2e49de65faec14ff5d81025f",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (143).jpg",
+      "md5": "f948ed100229dddd90d48ff7df70024f",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (146).jpg",
+      "md5": "8e56d2d593413b57aa2e6c8bc6f20bc1",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (15).jpg",
+      "md5": "a9dd60458a3f80f53615cc905ae90834",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (158).jpg",
+      "md5": "acc52486ed95f3992a3e3d199b0ef598",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (165).jpg",
+      "md5": "65e48bfb759e64554493061588cbdf48",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (175).jpg",
+      "md5": "3252f1e5ac88615b375ece230f8f768f",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (21).jpg",
+      "md5": "e62369389496d3773a7beb8f584207d2",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (24).jpg",
+      "md5": "dd2b21198ab5179e212b78d3cf4ab71c",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (25).jpg",
+      "md5": "01f2662550da260f6e542aa5ba7a0a90",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (37).jpg",
+      "md5": "8dd2b971b4420fad858f17a838796337",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (4).jpg",
+      "md5": "d49b8d5a1f58620598194d58784a2c19",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (45).jpg",
+      "md5": "7d2b090b7588bd9dbc92b1d4e7ecb317",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (53).jpg",
+      "md5": "6df270000fcc845f7e6c517be0d15728",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (64).jpg",
+      "md5": "190abe6d85b8607bed83ba7c04a2a62f",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (69).jpg",
+      "md5": "31cb30f8e330469157181c314b73c200",
+      "class": "Corn___Northern_Leaf_Blight"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (24).jpg",
+      "md5": "551b01d32274b088245a9416dee3dace",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (29).jpg",
+      "md5": "62e112f05319d7ce40ca7e2dd7ec1a20",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (42).jpg",
+      "md5": "181ffee683ad451ab0143779462d5eb1",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (49).jpg",
+      "md5": "d9e1adb285eca2d94e3f76e766d33d0f",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (50).jpg",
+      "md5": "61e2d7123459feb768b4086cd58cf31c",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (56).jpg",
+      "md5": "7f34f68bb41d42210839a8c922d68de6",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (6).jpg",
+      "md5": "1089a008ed21145fa1e13a0f612a8bd9",
+      "class": "Grape___Black_rot"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_007_cam2.jpg",
+      "md5": "3aa4eab4a85fb27be48dc1317c5a810f",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_031_cam2.jpg",
+      "md5": "e5ac7c487dc6f32cb631ab2d4fc629a0",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_033_cam2.jpg",
+      "md5": "37f9921204947b382dab6b5dc6dc3268",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_135_cam2.jpg",
+      "md5": "8bdd8e047c3ae4b84c465b3b46a4746c",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_184_cam2.jpg",
+      "md5": "8d655edb0790a2f3a357a65006280684",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_266_cam2.jpg",
+      "md5": "a8c312aab1e30ef3ea4fd6793a80559d",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_304_cam2.jpg",
+      "md5": "e517b112008d86ef6af39c1d15a6900a",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_442_cam1.jpg",
+      "md5": "1754a9f5aa4bd6de9e83d496ce296438",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_501_cam2.jpg",
+      "md5": "04d8e710e46a0d48b609aebc661057ef",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___Esca_(Black_Measles)\\ALT__esca_535_cam2.jpg",
+      "md5": "3c178eca16fba3fa4c52ceb5e3cd53e6",
+      "class": "Grape___Esca_(Black_Measles)"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\ALT__healthy_346_cam3.jpg",
+      "md5": "b5a69c1dd05941db77bc0a1bac05118d",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\ALT__healthy_421_cam3.jpg",
+      "md5": "683d79a5bb14f80b6d910996013c8364",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\ALT__healthy_845_cam3.jpg",
+      "md5": "f3f712fce72aa5f9f77b103137371cdb",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (2).jpg",
+      "md5": "1b45f36789d4d7f86d9024e39d0c07bf",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (28).jpg",
+      "md5": "abedc0e82ce5f0be22491a9f84996c6e",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (30).jpg",
+      "md5": "9d3f4b2eeca7c9dde7865d1525d6f52f",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (37).jpg",
+      "md5": "c0ce6eeef29ae4945355197a828d2a25",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (38).jpg",
+      "md5": "fe90005d3d75cbeb2345cdd186b1261c",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (45).jpg",
+      "md5": "c682f5da691810a7d94130696f9425ef",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Grape___healthy\\PD__grape leaf (47).jpg",
+      "md5": "053e424ab050ef372647cb98f27ffa63",
+      "class": "Grape___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (1).jpg",
+      "md5": "a9c5c2e37a845c953590cc77911ebc0c",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (102).jpg",
+      "md5": "aaf43889e6bb8688ca09205fea0a4d5b",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (15).jpg",
+      "md5": "94adb922c96b8a5d7b18725797e7f2a4",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (23).jpg",
+      "md5": "c8f94cadc132de586be9bda200e27eaf",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (25).jpg",
+      "md5": "b479503560e78925beab86085571a04a",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (3).jpg",
+      "md5": "af49ff807aa096280c28d6e53363a68f",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (33).jpg",
+      "md5": "932c869666fcd050fd421893211b5ce6",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (61).jpg",
+      "md5": "32117c8310bbf70fda2da82eaff90251",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (70).jpg",
+      "md5": "7b6ea0ced9ac910f839183dd42d9b686",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (76).jpg",
+      "md5": "09cbcef9cbee7691e79eb82c6a3cc68a",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (82).jpg",
+      "md5": "8c932c8572b2cd309a3a56a8ebd631e8",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (99).jpg",
+      "md5": "542a114a0eac99c99a85e3d3accc9a46",
+      "class": "Peach___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (13).jpg",
+      "md5": "9486707ef89df637f896ceb589ddab24",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (2).jpg",
+      "md5": "52db59c45e5f75097a3e7b49ec419906",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (24).jpg",
+      "md5": "c9486e256fd118371f8664fa20466b9a",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (36).jpg",
+      "md5": "324a9d694c9754ccce9312622b19c08e",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (5).jpg",
+      "md5": "d6e1ee6c8a942694d5bf81d70cbb7619",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (6).jpg",
+      "md5": "ce0850c20b5cf84470cae08cf7530d8d",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (7).jpg",
+      "md5": "0aa9e457ebffcb879ceb6f554be9befc",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (8).jpg",
+      "md5": "c256b18588efc00fc980d3895fd7706b",
+      "class": "Pepper,_bell___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (1).jpg",
+      "md5": "0678449193291217efe027bd282caf6c",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (17).jpg",
+      "md5": "d3a2a2a3a51631ca05d5d51a16c59865",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (21).jpg",
+      "md5": "86ecf2e5cebdbe200b86509249bd576f",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (22).jpg",
+      "md5": "caf2855c4b0fb43a60aa21331a334e08",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (26).jpg",
+      "md5": "213b21f49e37a6e0d737839fc19d1073",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (3).jpg",
+      "md5": "3b8728d96dc8180409c06fa6b3481bc6",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (8).jpg",
+      "md5": "8e368ad7fd302b54bd3af7585aa955f6",
+      "class": "Pepper,_bell___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (104).jpg",
+      "md5": "b0c5c60be674e7b16d7507389fe8eda7",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (21).jpg",
+      "md5": "a6c3d6a8a92543c424e3f8e19ecfd2f8",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (30).jpg",
+      "md5": "f978a4f709c2edd77d17921ffd1c11cd",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (34).jpg",
+      "md5": "469e732bcfd84eb05af4982b1e196edf",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (35).jpg",
+      "md5": "db390c7e017b45068a4a39f232fff96a",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (4).jpg",
+      "md5": "8acaafcb003accb550c9e4bb2e319b1c",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (41).jpg",
+      "md5": "cf5abb9f79cd2fd269004823f96fd09f",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (44).jpg",
+      "md5": "2d68ff427cbdb9fed429a8cef9cb8fad",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (59).jpg",
+      "md5": "b66781c238bd756778e47a16b2389f8b",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (75).jpg",
+      "md5": "283135728cdfd80ade77171a3f52a3ed",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (76).jpg",
+      "md5": "a59f3cf33671b7ab3cbd8bd39a987af6",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (89).jpg",
+      "md5": "6ffaf52651d9be9695db4a3862c9fa63",
+      "class": "Potato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230712_121709.jpg",
+      "md5": "ed4bc9990f5cad5ab5a84e32d445798e",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230712_122745.jpg",
+      "md5": "f5b63fc069aebb8b37e8afb0cd75e472",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230712_143916.jpg",
+      "md5": "20c3d3367b8bf3b4dfbbe4cf0db2948f",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230802_130139.jpg",
+      "md5": "f14b61e2cc2283f0ebf498e8d9bc523d",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230815_112459.jpg",
+      "md5": "77788e680be5a829292cfd604757f39a",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230815_115654.jpg",
+      "md5": "5120cfec7b87675b4d31e186817df6dc",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230816_121553.jpg",
+      "md5": "0cc02c567610c58ffb693b138ed485e5",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230922_154128.jpg",
+      "md5": "784f8bf40d753f6a5dc6ad862f16e3b1",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__20230922_154220.jpg",
+      "md5": "664f951b81b77af554866a34ff732e06",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___healthy\\ALT__IMG_8223.JPG",
+      "md5": "15a74118e11629d8bb1efdc725e1a9d6",
+      "class": "Potato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (19).jpg",
+      "md5": "ce0ad99cdbbf5dedccd96061c88a6d99",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (25).jpg",
+      "md5": "f7a8606e3fba3172ba0ef9c50cebc7c3",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (36).jpg",
+      "md5": "edb232c88280a66e210f776934b7b0b2",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (38).jpg",
+      "md5": "8b83174a7064c0710490d66e37474295",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (40).jpg",
+      "md5": "440a437f921762af056b2dd613210e4c",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (41).jpg",
+      "md5": "bbfda624c354b7bdb3fb28038c18db52",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (57).jpg",
+      "md5": "e4a5b21ed74f1bab44b59cc93754c84f",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (62).jpg",
+      "md5": "ca9569404ffd5931749fc3b744f1b30a",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (70).jpg",
+      "md5": "7844cb7dd49e697b8fb68529607e844f",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (78).jpg",
+      "md5": "a51ff24bb82ee011703fc0e23366a6cb",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Potato___Late_blight\\PD__Potato leaf late blight (94).jpg",
+      "md5": "51ff33226d420438c1089bcf5563c5a1",
+      "class": "Potato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (10).jpg",
+      "md5": "8cc5fb551dbd6d24d0da97745bd34ce7",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (100).jpg",
+      "md5": "83d548fa0b357eb7b7a66aa614de00d8",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (101).jpg",
+      "md5": "a31cc4d240a6a9b96d209b8cc41e639b",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (109).jpg",
+      "md5": "f04f61d85e633ddad5578eb26d0350d1",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (16).jpg",
+      "md5": "486b6b9fb3ce754d24bcbef7b9f827fb",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (19).jpg",
+      "md5": "6379b8f8ccee3f30cf4d5d04016c2629",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (23).jpg",
+      "md5": "ec8350dc72776ce8cf12254fae99c1df",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (36).jpg",
+      "md5": "ff9fd329651f90ff0dc8454d91992b73",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (4).jpg",
+      "md5": "9d47dde22c5243e5a43390125039c7c4",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (43).jpg",
+      "md5": "ae3b62a9b678c6ebb3f113a4720ba3e4",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (44).jpg",
+      "md5": "339aeaea77c831f8fa15414d14f25077",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (6).jpg",
+      "md5": "b079f6b16285ff9bdefabd93b261f5ae",
+      "class": "Raspberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (14).jpg",
+      "md5": "b765969163f9260235ec18a076f18eb9",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (26).jpg",
+      "md5": "e8b22b8527f0f79e45053d71b8c00ed4",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (4).jpg",
+      "md5": "d5c1a811e3e20796c0f359615ba6dfab",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (43).jpg",
+      "md5": "4538da378b0db3803d01fa6ed4b1a294",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (56).jpg",
+      "md5": "4de8d048878cd2315159758992adc2e3",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (8).jpg",
+      "md5": "124dca6b8d743cc2f03f368d466ee38e",
+      "class": "Soybean___healthy"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (110).jpg",
+      "md5": "b934872f8a5228e7710a9beff393c81f",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (112).jpg",
+      "md5": "3ff936080d86c724d3c9f356bc875986",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (117).jpg",
+      "md5": "cfbc168db8e751394b447cce33fc9683",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (13).jpg",
+      "md5": "f6d2586f7735a08d662a5459737522bf",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (17).jpg",
+      "md5": "43e5efc3d290eade9e32a89d27f10b79",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (19).jpg",
+      "md5": "241cba397e97416ed0f768d9570f17bc",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (2).jpg",
+      "md5": "4381d681daa8fc941c39aee0531734e5",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (25).jpg",
+      "md5": "cadc111e3961790907fde5cd5dfc8639",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (33).jpg",
+      "md5": "9173c954211ceed3587e2057afa886e3",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (38).jpg",
+      "md5": "7b794c82939d5a524384e779b5c0492c",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (47).jpg",
+      "md5": "a6e444665d27cb3127730dea73660d87",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (60).jpg",
+      "md5": "39935b6fb47041a6fe64daea5824be7d",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (84).jpg",
+      "md5": "488c77bd8616e3e0f6ec8670277ec1a2",
+      "class": "Squash___Powdery_mildew"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (11).jpg",
+      "md5": "e3d2b5a1d5fd77fccca29e2a206f5043",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (16).jpg",
+      "md5": "5c1c922bcfd3db4922b5274bc7aac8af",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (19).jpg",
+      "md5": "24a79e1b9a41c9173ff79795eecddff9",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (24).jpg",
+      "md5": "d0106512800058da4b19662da12c9097",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (35).jpg",
+      "md5": "bc52ec4be180c16a7612654f0c4db816",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (39).jpg",
+      "md5": "998e77ead4057aa4cfe49bbfd692a967",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (4).jpg",
+      "md5": "7b12f89128f9bf97ffa92efdce4e1d97",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (51).jpg",
+      "md5": "6edf060c3d6809daba3d7c99acf0e5cc",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (7).jpg",
+      "md5": "481b5beebfc85959f57ce74922c21316",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (86).jpg",
+      "md5": "bd461e6b923db51cec68652348c9c47a",
+      "class": "Strawberry___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (14).jpg",
+      "md5": "1415a7dc8a7e09e5968821073af10639",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (2).jpg",
+      "md5": "03471392f4ed6981b8c1ee9635859489",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (20).jpg",
+      "md5": "90660b1d43fa99819682f693fa20f2e6",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (27).jpg",
+      "md5": "241a6737f2e960131c389a9a76f1d5f8",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (49).jpg",
+      "md5": "b3e75238c93b939e483d5cb6f72508cf",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (53).jpg",
+      "md5": "11d672922e2d6771dd5ec4877e6cdabe",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (6).jpg",
+      "md5": "dfc03dd488c2ca607da4ca6bd7ac2485",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (71).jpg",
+      "md5": "350a7045f0242f9f0d95a67704fe7d25",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (73).jpg",
+      "md5": "983962ed9eeed040cd83867913a7b466",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (75).jpg",
+      "md5": "3ac3b9a922e7060c87ad2a2a1a981faf",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (81).jpg",
+      "md5": "85fb5b42ca9c6bb136263e9eed099d0d",
+      "class": "Tomato___Bacterial_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (1).jpg",
+      "md5": "fa1a22838e982e0efba0a722731c6b3b",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (18).jpg",
+      "md5": "eef02b1252b15499dd3a2cf17aacc2c7",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (33).jpg",
+      "md5": "60ed86831cb1f351ccb1cc82dadcceec",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (41).jpg",
+      "md5": "22cbc5406b1bd134c4463a469bc1fee9",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (49).jpg",
+      "md5": "2d9a4997bf687b408d7e4efc8055773d",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (53).jpg",
+      "md5": "b82a0af16210697f06925663b9acd074",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (67).jpg",
+      "md5": "4f9ce949b194c882e314f99650f154ed",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (7).jpg",
+      "md5": "9f68685ef8b7fbc12e5e2ca4432f2997",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (8).jpg",
+      "md5": "d41dc6222c9517bef5c86070a971af0f",
+      "class": "Tomato___Early_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (13).jpg",
+      "md5": "dd2a681c07dbc55ef982de1a46e2f809",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (23).jpg",
+      "md5": "03fb4836a4dd9661fe7090bb23b70905",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (26).jpg",
+      "md5": "e5d2068677c77e199840ba98d1e5eba7",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (34).jpg",
+      "md5": "9e270fecb70fc6233155dc29ff60143c",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (4).jpg",
+      "md5": "2ddd7bd009591273e9f3b1815812445c",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (52).jpg",
+      "md5": "165178156f9680280225213b6d1385b7",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (8).jpg",
+      "md5": "299f2dc66a1c186036b5052302e7edc3",
+      "class": "Tomato___healthy"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (100).jpg",
+      "md5": "86a9121cd2134ea75839c67737bc3902",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (14).jpg",
+      "md5": "f04d2b8fc5263408bcdbb8a9569d2d88",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (31).jpg",
+      "md5": "1e39a731dc103e1f019d6e7ba0dd678b",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (4).jpg",
+      "md5": "6ba1300099da0822038fc2e39309e102",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (41).jpg",
+      "md5": "838da30ba4f0f2f99534bccc74e9ceca",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (48).jpg",
+      "md5": "e128f8b2137b811ff029b7f6949cd9ad",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (62).jpg",
+      "md5": "9ffe6f83d644f5798a348461632daab0",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (63).jpg",
+      "md5": "efc4ae4996c6d203104a8743902eaa17",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (65).jpg",
+      "md5": "8711bd211866c4b9bc29e52ec292a513",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (72).jpg",
+      "md5": "6a18c06552cc54f94cd8c00ad97dfd15",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (9).jpg",
+      "md5": "f07ae8593f2c5ac37ee411ea7f9e33d0",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (96).jpg",
+      "md5": "bbcdb44dd4c28d2407cccba3bb09f5f1",
+      "class": "Tomato___Late_blight"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (10).jpg",
+      "md5": "c0997ab48f97bff4bbce6194700ec0d3",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (12).jpg",
+      "md5": "fcb41691da6adec718ab1f95ab8afd37",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (26).jpg",
+      "md5": "4232f284234ff8671e6a05b1458fdc05",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (40).jpg",
+      "md5": "2ad0ce1e14dafd655566e3c3d9056769",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (45).jpg",
+      "md5": "41d04f667988e9ab5885f1395dd03c93",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (52).jpg",
+      "md5": "95cbf691ede57b94a597c3c2dc9c6136",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (59).jpg",
+      "md5": "f3f99a2b5cb0e9262d2f1bb5539ef530",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (75).jpg",
+      "md5": "cba979428feb1dd44fcae40a607f9a28",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (82).jpg",
+      "md5": "4d9e5a7566d32934ceae4677ebf01319",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Leaf_Mold\\PD__Tomato mold leaf (83).jpg",
+      "md5": "0eeacf59898e2408c96deec23a538831",
+      "class": "Tomato___Leaf_Mold"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (11).jpg",
+      "md5": "ffc53979fe36cf2ea2a39ffdd24d8a9e",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (12).jpg",
+      "md5": "fe27af68e35f95de11730c421e54d138",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (123).jpg",
+      "md5": "c4666f7940e8db54f3958830f3846c0a",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (128).jpg",
+      "md5": "0c0c8f4e2c5a2fcf5cb27bc7815e5b55",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (2).jpg",
+      "md5": "b39100ca02d66927473ad7b12fc7e8c4",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (29).jpg",
+      "md5": "3c1889447e069dda1f03557341467446",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (3).jpg",
+      "md5": "eac10419b9223cae8c69b6c549c3dfab",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (44).jpg",
+      "md5": "df93f720f55c93caf7dfe388e8b85e49",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (46).jpg",
+      "md5": "dbaa6e5ac389a2a32b3d3c65317a3d6a",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (68).jpg",
+      "md5": "e2eef39e77dbf6a635c45a643212f2b5",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (8).jpg",
+      "md5": "59b2bf9f04abfa10fd38279d8e5024d2",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (80).jpg",
+      "md5": "819576e6ff531d09f2ae7d4a5372a016",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (95).jpg",
+      "md5": "c13860a910e2565a3ee7b146124c99ba",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (99).jpg",
+      "md5": "e19cec566889c8eb00d7270630d4d43a",
+      "class": "Tomato___Septoria_leaf_spot"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (21).jpg",
+      "md5": "599553dea4e2adf61b894f45aecd0eb4",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (23).jpg",
+      "md5": "a404c6ed88dec027526d860e85db7472",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (26).jpg",
+      "md5": "dd6deef4d28dd6b6ee32b62359fb27b3",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (31).jpg",
+      "md5": "0e2f203d4190fac5ed28ea7e13a1748f",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (41).jpg",
+      "md5": "d8b50052badf88faa677d63a7b3b5718",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (9).jpg",
+      "md5": "e773d2a356a16a1ce1eeeb2bb6ea2dae",
+      "class": "Tomato___Tomato_mosaic_virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (18).jpg",
+      "md5": "7ceed02cedccc90328e25d10a843da02",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (29).jpg",
+      "md5": "fb28ea60af8d88f14f6f8064b1d38fa9",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (41).jpg",
+      "md5": "96f0995a1e99ac3dfcb7917fd7355456",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (48).jpg",
+      "md5": "d682024d5b50a2973e517441f897c720",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (5).jpg",
+      "md5": "e367de7c0998d08f296f038e2d05dff7",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (54).jpg",
+      "md5": "946f04e7179016486b18faeb44e61409",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (62).jpg",
+      "md5": "cd7f7dba42e2bc3f1d144c67b3808b46",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    },
+    {
+      "path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (68).jpg",
+      "md5": "66a040b8efa44eb9527f470d353d3b31",
+      "class": "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    }
+  ]
+}
