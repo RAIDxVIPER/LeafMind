@@ -106,8 +106,10 @@ def main():
     
     # Load class map
     with open(CLASS_MAP_FILE) as f:
-        class_map = json.load(f)
-        
+        data = json.load(f)
+    
+    # Invert the mapping: class_name -> int ID
+    class_map = {v: int(k) for k, v in data['classes'].items()}
     num_classes = len(class_map)
     print(f"Classes: {num_classes}")
 
