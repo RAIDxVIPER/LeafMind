@@ -1,12 +1,12 @@
 {
   "_meta": {
     "split": "Test_OOD",
-    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
-    "image_count": 2368,
+    "d2_root": "Dataset_2",
+    "image_count": 2363,
     "notes": [
       "H8: within-split duplicates removed",
-      "6 files removed",
-      "IMPORTANT: D1 exclusions (config/exclusion_list.json) must ALSO be applied before eval (R7)."
+      "11 files removed",
+      "IMPORTANT: D1 exclusions (config/exclusion_list.json) are a secondary report only (D16). Primary OOD uses full deduped set."
     ],
     "generated_by": "scripts/build_split_manifests.py"
   },
@@ -2187,11 +2187,6 @@
       "class": "Corn_(maize)___healthy"
     },
     {
-      "path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (1).jpg",
-      "md5": "43ba8a87d9053032195c7c59bc01f1fc",
-      "class": "Corn___Cercospora_leaf_spot"
-    },
-    {
       "path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (10).jpg",
       "md5": "8294403a8e63ec0e4b1cb219d01d2235",
       "class": "Corn___Cercospora_leaf_spot"
@@ -2199,11 +2194,6 @@
     {
       "path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (11).jpg",
       "md5": "904cffa79efd1423b2daa05e169a0024",
-      "class": "Corn___Cercospora_leaf_spot"
-    },
-    {
-      "path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (12).jpg",
-      "md5": "8edd2518767e8b140ffe3c6f3d37609d",
       "class": "Corn___Cercospora_leaf_spot"
     },
     {
@@ -5887,11 +5877,6 @@
       "class": "Potato___Early_blight"
     },
     {
-      "path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (14).jpg",
-      "md5": "33eb423bdbbc3a6ce8941be10a278a72",
-      "class": "Potato___Early_blight"
-    },
-    {
       "path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (15).jpg",
       "md5": "c42511b35cd3f5145747537b6a5a623a",
       "class": "Potato___Early_blight"
@@ -5934,11 +5919,6 @@
     {
       "path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (23).jpg",
       "md5": "73557b560827d483242886f075b45a3a",
-      "class": "Potato___Early_blight"
-    },
-    {
-      "path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (24).jpg",
-      "md5": "e4aff68ead58ba22a411c93db3a630af",
       "class": "Potato___Early_blight"
     },
     {
@@ -9254,11 +9234,6 @@
     {
       "path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (89).jpg",
       "md5": "f637d931caffccd778cecec016ff4c56",
-      "class": "Tomato___Bacterial_spot"
-    },
-    {
-      "path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (9).jpg",
-      "md5": "1fc7b6d3ecba2fe90bbf8f6078fd7e45",
       "class": "Tomato___Bacterial_spot"
     },
     {

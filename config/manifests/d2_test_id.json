@@ -1,11 +1,11 @@
 {
   "_meta": {
     "split": "Test_ID",
-    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
-    "image_count": 5924,
+    "d2_root": "Dataset_2",
+    "image_count": 5923,
     "notes": [
-      "H7: cross-split dups with Train removed",
-      "5 files removed",
+      "H7: cross-split dups with Train and Val removed",
+      "6 files removed",
       "D1 exclusions for OOD eval are separate (config/exclusion_list.json)"
     ],
     "generated_by": "scripts/build_split_manifests.py"
@@ -22054,11 +22054,6 @@
     {
       "path": "Test_ID\\Tomato___Late_blight\\PV__29587a7b-a64d-4d2e-8fab-d0ec587e8ecd___GHLB2 Leaf 9081.JPG",
       "md5": "6483b26bc693a894016a001477da0529",
-      "class": "Tomato___Late_blight"
-    },
-    {
-      "path": "Test_ID\\Tomato___Late_blight\\PV__2c47b891-3c97-48f1-a2cc-5aa53d3a1148___GHLB2 Leaf 9011.JPG",
-      "md5": "1d87a50fa691cef6f476b20bb48cfaf8",
       "class": "Tomato___Late_blight"
     },
     {

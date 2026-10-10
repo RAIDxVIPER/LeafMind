@@ -1,7 +1,7 @@
 {
   "_meta": {
     "split": "Val",
-    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
+    "d2_root": "Dataset_2",
     "image_count": 5936,
     "notes": [
       "H6: cross-split dups with Train removed",

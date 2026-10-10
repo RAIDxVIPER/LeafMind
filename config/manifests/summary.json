@@ -16,13 +16,13 @@
     },
     "Test_ID": {
       "raw": 5929,
-      "after_dedup": 5924,
-      "removed": 5
+      "after_dedup": 5923,
+      "removed": 6
     },
     "Test_OOD": {
       "raw": 2374,
-      "after_dedup": 2368,
-      "removed": 6
+      "after_dedup": 2363,
+      "removed": 11
     },
     "Few_Shot": {
       "raw": 300,
@@ -38,6 +38,12 @@
       "reason": "within-split duplicate in Train"
     },
     {
+      "removed_path": "Train\\Apple___healthy\\PV__c21cf428-bfc3-4710-b5d2-69d1c0e94748___RS_HL 6268.JPG",
+      "kept_path": "Train\\Apple___healthy\\PV__14896dc0-688d-456f-b5ec-a037695b0193___RS_HL 6268.JPG",
+      "md5": "161940bd6e73cf648974cc7213cffb8f",
+      "reason": "within-split duplicate in Train"
+    },
+    {
       "removed_path": "Train\\Apple___healthy\\PV__3673d121-b5de-481c-b057-d4ee5b4959b1___RS_HL 6269.JPG",
       "kept_path": "Train\\Apple___healthy\\PV__1ab5e019-e5f0-4d8e-a252-94cb0aab8b0a___RS_HL 6269.JPG",
       "md5": "68f05a541bf01c0fcfbc7f9445f8a147",
@@ -50,9 +56,9 @@
       "reason": "within-split duplicate in Train"
     },
     {
-      "removed_path": "Train\\Apple___healthy\\PV__c21cf428-bfc3-4710-b5d2-69d1c0e94748___RS_HL 6268.JPG",
-      "kept_path": "Train\\Apple___healthy\\PV__14896dc0-688d-456f-b5ec-a037695b0193___RS_HL 6268.JPG",
-      "md5": "161940bd6e73cf648974cc7213cffb8f",
+      "removed_path": "Train\\Tomato___healthy\\PV__cfd491d6-4af5-4728-8f0e-0d330a07174a___GH_HL Leaf 482.2.JPG",
+      "kept_path": "Train\\Tomato___healthy\\PV__1af0bfe1-4bcf-4b8b-be66-5d0953eb647e___GH_HL Leaf 482.2.JPG",
+      "md5": "ea0a44df2e4e44c6ccacc31f067a6284",
       "reason": "within-split duplicate in Train"
     },
     {
@@ -62,21 +68,21 @@
       "reason": "within-split duplicate in Train"
     },
     {
+      "removed_path": "Train\\Tomato___healthy\\PV__e786ac89-29fe-47e3-b49e-b9a9ee7edd9d___GH_HL Leaf 342.1.JPG",
+      "kept_path": "Train\\Tomato___healthy\\PV__37aad83b-7ff8-4b35-b3ed-fb8e0f54910b___GH_HL Leaf 342.1.JPG",
+      "md5": "3dab5eb1192b5c43fd3015490cf0b18f",
+      "reason": "within-split duplicate in Train"
+    },
+    {
       "removed_path": "Train\\Tomato___healthy\\PV__a5de43e7-fc2f-4a14-a8e6-c0f2f94c84f1___GH_HL Leaf 434.JPG",
       "kept_path": "Train\\Tomato___healthy\\PV__488feb1c-4b9f-44e7-8aa6-4103a9601f5f___GH_HL Leaf 434.JPG",
       "md5": "6e48e89e89da343b6b90ccda5b18d698",
       "reason": "within-split duplicate in Train"
     },
     {
-      "removed_path": "Train\\Tomato___healthy\\PV__cfd491d6-4af5-4728-8f0e-0d330a07174a___GH_HL Leaf 482.2.JPG",
-      "kept_path": "Train\\Tomato___healthy\\PV__1af0bfe1-4bcf-4b8b-be66-5d0953eb647e___GH_HL Leaf 482.2.JPG",
-      "md5": "ea0a44df2e4e44c6ccacc31f067a6284",
-      "reason": "within-split duplicate in Train"
-    },
-    {
-      "removed_path": "Train\\Tomato___healthy\\PV__e786ac89-29fe-47e3-b49e-b9a9ee7edd9d___GH_HL Leaf 342.1.JPG",
-      "kept_path": "Train\\Tomato___healthy\\PV__37aad83b-7ff8-4b35-b3ed-fb8e0f54910b___GH_HL Leaf 342.1.JPG",
-      "md5": "3dab5eb1192b5c43fd3015490cf0b18f",
+      "removed_path": "Train\\Tomato___Late_blight\\PV__d82b634e-9a19-497b-b698-aaf100d622a1___GHLB_PS Leaf 24 Day 13.jpg",
+      "kept_path": "Train\\Tomato___Late_blight\\PV__861d8b00-57a4-46b0-b51a-09d102dbe119___GHLB_PS Leaf 24 Day 13.jpg",
+      "md5": "c1b24c8caaa06e756560a83d7358579e",
       "reason": "within-split duplicate in Train"
     },
     {
@@ -92,46 +98,70 @@
       "reason": "within-split duplicate in Train"
     },
     {
-      "removed_path": "Train\\Tomato___Late_blight\\PV__d82b634e-9a19-497b-b698-aaf100d622a1___GHLB_PS Leaf 24 Day 13.jpg",
-      "kept_path": "Train\\Tomato___Late_blight\\PV__861d8b00-57a4-46b0-b51a-09d102dbe119___GHLB_PS Leaf 24 Day 13.jpg",
-      "md5": "c1b24c8caaa06e756560a83d7358579e",
-      "reason": "within-split duplicate in Train"
-    },
-    {
       "removed_path": "Test_OOD\\Blueberry___healthy\\PD__Blueberry leaf (49).jpg",
       "kept_path": "Test_OOD\\Blueberry___healthy\\PD__Blueberry leaf (1).jpg",
       "md5": "ba5dcc6822fe97d13578703e2988b2ce",
       "reason": "within-split duplicate in Test_OOD"
     },
     {
-      "removed_path": "Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (121).jpg",
-      "kept_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (1).jpg",
+      "removed_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (1).jpg",
+      "kept_path": null,
       "md5": "43ba8a87d9053032195c7c59bc01f1fc",
-      "reason": "within-split duplicate in Test_OOD"
+      "reason": "label-conflicting duplicate in Test_OOD"
+    },
+    {
+      "removed_path": "Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (121).jpg",
+      "kept_path": null,
+      "md5": "43ba8a87d9053032195c7c59bc01f1fc",
+      "reason": "label-conflicting duplicate in Test_OOD"
+    },
+    {
+      "removed_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (12).jpg",
+      "kept_path": null,
+      "md5": "8edd2518767e8b140ffe3c6f3d37609d",
+      "reason": "label-conflicting duplicate in Test_OOD"
     },
     {
       "removed_path": "Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (7).jpg",
-      "kept_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (12).jpg",
+      "kept_path": null,
       "md5": "8edd2518767e8b140ffe3c6f3d37609d",
-      "reason": "within-split duplicate in Test_OOD"
+      "reason": "label-conflicting duplicate in Test_OOD"
+    },
+    {
+      "removed_path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (14).jpg",
+      "kept_path": null,
+      "md5": "33eb423bdbbc3a6ce8941be10a278a72",
+      "reason": "label-conflicting duplicate in Test_OOD"
     },
     {
       "removed_path": "Test_OOD\\Potato___Late_blight\\PD__Potato leaf late blight (11).jpg",
-      "kept_path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (14).jpg",
+      "kept_path": null,
       "md5": "33eb423bdbbc3a6ce8941be10a278a72",
-      "reason": "within-split duplicate in Test_OOD"
+      "reason": "label-conflicting duplicate in Test_OOD"
+    },
+    {
+      "removed_path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (24).jpg",
+      "kept_path": null,
+      "md5": "e4aff68ead58ba22a411c93db3a630af",
+      "reason": "label-conflicting duplicate in Test_OOD"
     },
     {
       "removed_path": "Test_OOD\\Potato___Late_blight\\PD__Potato leaf late blight (4).jpg",
-      "kept_path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (24).jpg",
+      "kept_path": null,
       "md5": "e4aff68ead58ba22a411c93db3a630af",
-      "reason": "within-split duplicate in Test_OOD"
+      "reason": "label-conflicting duplicate in Test_OOD"
+    },
+    {
+      "removed_path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (9).jpg",
+      "kept_path": null,
+      "md5": "1fc7b6d3ecba2fe90bbf8f6078fd7e45",
+      "reason": "label-conflicting duplicate in Test_OOD"
     },
     {
       "removed_path": "Test_OOD\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (109).jpg",
-      "kept_path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (9).jpg",
+      "kept_path": null,
       "md5": "1fc7b6d3ecba2fe90bbf8f6078fd7e45",
-      "reason": "within-split duplicate in Test_OOD"
+      "reason": "label-conflicting duplicate in Test_OOD"
     },
     {
       "removed_path": "Val\\Apple___healthy\\PV__9b75de13-d4b0-4b3f-988c-3e9926eef957___RS_HL 6273.JPG",
@@ -177,6 +207,11 @@
       "removed_path": "Test_ID\\Tomato___Late_blight\\PV__48c55974-9fe9-4f4b-94f7-c8cd127d1e05___GHLB_PS Leaf 23.7 Day 13.jpg",
       "md5": "3b227920ba50ce0a4602b258f624e935",
       "reason": "H7: D2_Test_ID<->D2_Train duplicate \u2014 removed from Test_ID"
+    },
+    {
+      "removed_path": "Test_ID\\Tomato___Late_blight\\PV__2c47b891-3c97-48f1-a2cc-5aa53d3a1148___GHLB2 Leaf 9011.JPG",
+      "md5": "1d87a50fa691cef6f476b20bb48cfaf8",
+      "reason": "D2_Test_ID<->D2_Val duplicate \u2014 removed from Test_ID"
     }
   ],
   "few_shot_test_ood_filename_overlap": 47,

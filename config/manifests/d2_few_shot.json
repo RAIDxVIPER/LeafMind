@@ -1,7 +1,7 @@
 {
   "_meta": {
     "split": "Few_Shot",
-    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
+    "d2_root": "Dataset_2",
     "image_count": 300,
     "notes": [
       "No within-split dups found in audit. Full list."

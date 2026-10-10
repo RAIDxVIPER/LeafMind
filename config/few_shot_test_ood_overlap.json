@@ -5,7 +5,7 @@
     "expected_count": 47,
     "generated_by": "scripts/build_split_manifests.py",
     "issue_ref": "I3",
-    "note": "[ENG assumption] byte-identity not confirmed; use filename exclusion conservatively."
+    "note": "47 filename matches were pHash-verified as different images (0 near-duplicates), so they need NOT be excluded for the classifier. Keep the exclusion advice only for models actually adapted on Few_Shot."
   },
   "filenames": [
     "PD__Apple Scab Leaf (3).jpg",
@@ -55,5 +55,340 @@
     "PD__Tomato leaf yellow virus (5).jpg",
     "PD__grape leaf (2).jpg",
     "PD__grape leaf black rot (6).jpg"
-  ]
+  ],
+  "verification": {
+    "near_duplicates": 0,
+    "different_images": 47,
+    "details": [
+      {
+        "filename": "PD__Apple Scab Leaf (3).jpg",
+        "ood_path": "Test_OOD\\Apple___Apple_scab\\PD__Apple Scab Leaf (3).jpg",
+        "few_shot_path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (3).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Apple Scab Leaf (4).jpg",
+        "ood_path": "Test_OOD\\Apple___Apple_scab\\PD__Apple Scab Leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Apple___Apple_scab\\PD__Apple Scab Leaf (4).jpg",
+        "hamming_distance": 36,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Apple leaf (2).jpg",
+        "ood_path": "Test_OOD\\Apple___healthy\\PD__Apple leaf (2).jpg",
+        "few_shot_path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (2).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Apple leaf (9).jpg",
+        "ood_path": "Test_OOD\\Apple___healthy\\PD__Apple leaf (9).jpg",
+        "few_shot_path": "Few_Shot\\Apple___healthy\\PD__Apple leaf (9).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Apple rust leaf (9).jpg",
+        "ood_path": "Test_OOD\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (9).jpg",
+        "few_shot_path": "Few_Shot\\Apple___Cedar_apple_rust\\PD__Apple rust leaf (9).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf (1).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (1).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (1).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf (3).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (3).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (3).jpg",
+        "hamming_distance": 28,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf (8).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (8).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___healthy\\PD__Bell_pepper leaf (8).jpg",
+        "hamming_distance": 38,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf spot (2).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (2).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (2).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf spot (5).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (5).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (5).jpg",
+        "hamming_distance": 36,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf spot (6).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (6).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (6).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf spot (7).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (7).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (7).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Bell_pepper leaf spot (8).jpg",
+        "ood_path": "Test_OOD\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (8).jpg",
+        "few_shot_path": "Few_Shot\\Pepper,_bell___Bacterial_spot\\PD__Bell_pepper leaf spot (8).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Cherry leaf (10).jpg",
+        "ood_path": "Test_OOD\\Cherry___healthy\\PD__Cherry leaf (10).jpg",
+        "few_shot_path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (10).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Cherry leaf (4).jpg",
+        "ood_path": "Test_OOD\\Cherry___healthy\\PD__Cherry leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Cherry___healthy\\PD__Cherry leaf (4).jpg",
+        "hamming_distance": 28,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn Gray leaf spot (2).jpg",
+        "ood_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (2).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (2).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn Gray leaf spot (3).jpg",
+        "ood_path": "Test_OOD\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (3).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Cercospora_leaf_spot\\PD__Corn Gray leaf spot (3).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn leaf blight (4).jpg",
+        "ood_path": "Test_OOD\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (4).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Northern_Leaf_Blight\\PD__Corn leaf blight (4).jpg",
+        "hamming_distance": 36,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn rust leaf (2).jpg",
+        "ood_path": "Test_OOD\\Corn___Common_rust\\PD__Corn rust leaf (2).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (2).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn rust leaf (3).jpg",
+        "ood_path": "Test_OOD\\Corn___Common_rust\\PD__Corn rust leaf (3).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (3).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn rust leaf (4).jpg",
+        "ood_path": "Test_OOD\\Corn___Common_rust\\PD__Corn rust leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (4).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Corn rust leaf (7).jpg",
+        "ood_path": "Test_OOD\\Corn___Common_rust\\PD__Corn rust leaf (7).jpg",
+        "few_shot_path": "Few_Shot\\Corn___Common_rust\\PD__Corn rust leaf (7).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Peach leaf (1).jpg",
+        "ood_path": "Test_OOD\\Peach___healthy\\PD__Peach leaf (1).jpg",
+        "few_shot_path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (1).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Peach leaf (3).jpg",
+        "ood_path": "Test_OOD\\Peach___healthy\\PD__Peach leaf (3).jpg",
+        "few_shot_path": "Few_Shot\\Peach___healthy\\PD__Peach leaf (3).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Potato leaf early blight (4).jpg",
+        "ood_path": "Test_OOD\\Potato___Early_blight\\PD__Potato leaf early blight (4).jpg",
+        "few_shot_path": "Few_Shot\\Potato___Early_blight\\PD__Potato leaf early blight (4).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Raspberry leaf (4).jpg",
+        "ood_path": "Test_OOD\\Raspberry___healthy\\PD__Raspberry leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (4).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Raspberry leaf (6).jpg",
+        "ood_path": "Test_OOD\\Raspberry___healthy\\PD__Raspberry leaf (6).jpg",
+        "few_shot_path": "Few_Shot\\Raspberry___healthy\\PD__Raspberry leaf (6).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Soyabean leaf (4).jpg",
+        "ood_path": "Test_OOD\\Soybean___healthy\\PD__Soyabean leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Soybean___healthy\\PD__Soyabean leaf (4).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Squash Powdery mildew leaf (2).jpg",
+        "ood_path": "Test_OOD\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (2).jpg",
+        "few_shot_path": "Few_Shot\\Squash___Powdery_mildew\\PD__Squash Powdery mildew leaf (2).jpg",
+        "hamming_distance": 36,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Strawberry leaf (4).jpg",
+        "ood_path": "Test_OOD\\Strawberry___healthy\\PD__Strawberry leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (4).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Strawberry leaf (7).jpg",
+        "ood_path": "Test_OOD\\Strawberry___healthy\\PD__Strawberry leaf (7).jpg",
+        "few_shot_path": "Few_Shot\\Strawberry___healthy\\PD__Strawberry leaf (7).jpg",
+        "hamming_distance": 38,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Early blight leaf (1).jpg",
+        "ood_path": "Test_OOD\\Tomato___Early_blight\\PD__Tomato Early blight leaf (1).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (1).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Early blight leaf (7).jpg",
+        "ood_path": "Test_OOD\\Tomato___Early_blight\\PD__Tomato Early blight leaf (7).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (7).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Early blight leaf (8).jpg",
+        "ood_path": "Test_OOD\\Tomato___Early_blight\\PD__Tomato Early blight leaf (8).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Early_blight\\PD__Tomato Early blight leaf (8).jpg",
+        "hamming_distance": 28,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Septoria leaf spot (11).jpg",
+        "ood_path": "Test_OOD\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (11).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (11).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Septoria leaf spot (2).jpg",
+        "ood_path": "Test_OOD\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (2).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (2).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato Septoria leaf spot (3).jpg",
+        "ood_path": "Test_OOD\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (3).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Septoria_leaf_spot\\PD__Tomato Septoria leaf spot (3).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf (4).jpg",
+        "ood_path": "Test_OOD\\Tomato___healthy\\PD__Tomato leaf (4).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (4).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf (8).jpg",
+        "ood_path": "Test_OOD\\Tomato___healthy\\PD__Tomato leaf (8).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___healthy\\PD__Tomato leaf (8).jpg",
+        "hamming_distance": 34,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf bacterial spot (2).jpg",
+        "ood_path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (2).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (2).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf bacterial spot (6).jpg",
+        "ood_path": "Test_OOD\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (6).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Bacterial_spot\\PD__Tomato leaf bacterial spot (6).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf late blight (4).jpg",
+        "ood_path": "Test_OOD\\Tomato___Late_blight\\PD__Tomato leaf late blight (4).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (4).jpg",
+        "hamming_distance": 36,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf late blight (9).jpg",
+        "ood_path": "Test_OOD\\Tomato___Late_blight\\PD__Tomato leaf late blight (9).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Late_blight\\PD__Tomato leaf late blight (9).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf mosaic virus (9).jpg",
+        "ood_path": "Test_OOD\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (9).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Tomato_mosaic_virus\\PD__Tomato leaf mosaic virus (9).jpg",
+        "hamming_distance": 26,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__Tomato leaf yellow virus (5).jpg",
+        "ood_path": "Test_OOD\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (5).jpg",
+        "few_shot_path": "Few_Shot\\Tomato___Tomato_Yellow_Leaf_Curl_Virus\\PD__Tomato leaf yellow virus (5).jpg",
+        "hamming_distance": 32,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__grape leaf (2).jpg",
+        "ood_path": "Test_OOD\\Grape___healthy\\PD__grape leaf (2).jpg",
+        "few_shot_path": "Few_Shot\\Grape___healthy\\PD__grape leaf (2).jpg",
+        "hamming_distance": 30,
+        "is_near_duplicate": false
+      },
+      {
+        "filename": "PD__grape leaf black rot (6).jpg",
+        "ood_path": "Test_OOD\\Grape___Black_rot\\PD__grape leaf black rot (6).jpg",
+        "few_shot_path": "Few_Shot\\Grape___Black_rot\\PD__grape leaf black rot (6).jpg",
+        "hamming_distance": 38,
+        "is_near_duplicate": false
+      }
+    ]
+  }
 }

@@ -22,7 +22,9 @@ DEDUPLICATION APPLIED (from dataset_audit.md):
   CONSERVATIVE CHOICE [ENG assumption, logged in plan.md]:
     When removing cross-split duplicates, we keep the file in the split with "higher
     priority" for the duplicate role (Train > Val > Test_ID by priority).
-    When removing within-split duplicates, we keep the lexicographically first path.
+    When removing within-split duplicates:
+      - If duplicate group has different class labels, remove ALL copies (label-conflicting).
+      - If same class, keep the lexicographically first path.
 
 OUTPUT FILES:
   config/manifests/d2_train.json      — paths after H5 dedup
@@ -48,6 +50,13 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
+
+try:
+    from PIL import Image
+    import imagehash
+except ImportError:
+    Image = None
+    imagehash = None
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", ".tif"}
 
@@ -93,25 +102,42 @@ def dedup_within_split(
     entries: List[Tuple[str, str]], split_name: str
 ) -> Tuple[List[Tuple[str, str]], List[Dict]]:
     """
-    Remove within-split exact duplicates. Keeps the lexicographically first path.
+    Remove within-split exact duplicates. Keeps the lexicographically first path,
+    UNLESS the duplicates have different class labels, in which case ALL are removed.
     Returns (deduplicated entries, log of removed items).
     """
-    seen_md5s: Dict[str, str] = {}
+    by_md5 = defaultdict(list)
+    for rel, md5 in entries:
+        by_md5[md5].append((rel, md5))
+        
     kept = []
     removed_log = []
-    for rel, md5 in entries:
-        if md5 not in seen_md5s:
-            seen_md5s[md5] = rel
-            kept.append((rel, md5))
+    
+    for md5, group in by_md5.items():
+        if len(group) == 1:
+            kept.append(group[0])
         else:
-            removed_log.append(
-                {
-                    "removed_path": rel,
-                    "kept_path": seen_md5s[md5],
-                    "md5": md5,
-                    "reason": f"within-split duplicate in {split_name}",
-                }
-            )
+            classes = {Path(r).parts[1] if len(Path(r).parts) > 1 else "unknown" for r, _ in group}
+            if len(classes) > 1:
+                # Conflicting labels: remove ALL
+                for r, _ in group:
+                    removed_log.append({
+                        "removed_path": r,
+                        "kept_path": None,
+                        "md5": md5,
+                        "reason": f"label-conflicting duplicate in {split_name}"
+                    })
+            else:
+                # Same class: keep first, remove rest
+                kept.append(group[0])
+                for r, _ in group[1:]:
+                    removed_log.append({
+                        "removed_path": r,
+                        "kept_path": group[0][0],
+                        "md5": md5,
+                        "reason": f"within-split duplicate in {split_name}"
+                    })
+                    
     n_removed = len(removed_log)
     if n_removed > 0:
         logging.info("  %s: removed %d within-split duplicates.", split_name, n_removed)
@@ -155,7 +181,7 @@ def write_manifest(
     manifest = {
         "_meta": {
             "split": split_name,
-            "d2_root": str(d2_root.resolve()),
+            "d2_root": "Dataset_2", # Path relative to workspace or configured by env var
             "image_count": len(entries),
             "notes": notes,
             "generated_by": "scripts/build_split_manifests.py",
@@ -233,13 +259,23 @@ def main() -> None:
     dedup_log.extend(val_cross_removed)
 
     # H7: Remove from Test_ID files that exist in Train
-    test_id_final, testid_cross_removed = remove_cross_split_duplicates(
+    test_id_train_dedup, testid_cross_removed = remove_cross_split_duplicates(
         test_id_dedup,
         train_md5s,
         "Test_ID",
         "H7: D2_Test_ID<->D2_Train duplicate — removed from Test_ID",
     )
     dedup_log.extend(testid_cross_removed)
+
+    # Additional fix: Test_ID <-> Val leak
+    val_final_md5s = {md5 for _, md5 in val_final}
+    test_id_final, testid_val_removed = remove_cross_split_duplicates(
+        test_id_train_dedup,
+        val_final_md5s,
+        "Test_ID",
+        "D2_Test_ID<->D2_Val duplicate — removed from Test_ID",
+    )
+    dedup_log.extend(testid_val_removed)
 
     # ── Step 4: Audit comparison ──────────────────────────────────────────────
     logging.info("[Step 4] Audit comparison vs Part 1 ...")
@@ -289,17 +325,55 @@ def main() -> None:
 
     # ── Step 5: 47-file Few_Shot <-> Test_OOD filename overlap ────────────────
     logging.info("[Step 5] Computing Few_Shot <-> Test_OOD filename overlap ...")
-    ood_filenames: Set[str] = {
-        Path(rel).name for rel, _ in splits_raw["Test_OOD"]
-    }
-    fs_filenames: Set[str] = {
-        Path(rel).name for rel, _ in splits_raw["Few_Shot"]
-    }
-    filename_overlap = sorted(ood_filenames & fs_filenames)
+    
+    ood_paths_by_name = {Path(rel).name: rel for rel, _ in splits_raw["Test_OOD"]}
+    fs_paths_by_name = {Path(rel).name: rel for rel, _ in splits_raw["Few_Shot"]}
+    
+    filename_overlap = sorted(set(ood_paths_by_name.keys()) & set(fs_paths_by_name.keys()))
     logging.info(
         "  Few_Shot <-> Test_OOD filename overlap: %d files (expected ~47).",
         len(filename_overlap),
     )
+    
+    # Compute pHash for filename overlaps
+    verification = {
+        "near_duplicates": 0,
+        "different_images": 0,
+        "details": []
+    }
+    
+    if imagehash and Image:
+        for fname in filename_overlap:
+            ood_rel = ood_paths_by_name[fname]
+            fs_rel = fs_paths_by_name[fname]
+            ood_path = d2_root / ood_rel
+            fs_path = d2_root / fs_rel
+            
+            try:
+                ood_img = Image.open(ood_path)
+                fs_img = Image.open(fs_path)
+                ood_hash = imagehash.phash(ood_img)
+                fs_hash = imagehash.phash(fs_img)
+                dist = ood_hash - fs_hash
+                is_near_dup = dist <= 8
+                
+                if is_near_dup:
+                    verification["near_duplicates"] += 1
+                else:
+                    verification["different_images"] += 1
+                    
+                verification["details"].append({
+                    "filename": fname,
+                    "ood_path": ood_rel,
+                    "few_shot_path": fs_rel,
+                    "hamming_distance": dist,
+                    "is_near_duplicate": is_near_dup
+                })
+            except Exception as e:
+                logging.warning(f"Error computing phash for {fname}: {e}")
+    else:
+        logging.warning("imagehash or PIL not installed, skipping perceptual hash verification")
+
     if abs(len(filename_overlap) - 47) > 10:
         msg = f"MISMATCH: filename overlap = {len(filename_overlap)}, expected ~47 (I3, D8)."
         mismatches.append(msg)
@@ -322,6 +396,7 @@ def main() -> None:
             "note": "[ENG assumption] byte-identity not confirmed; use filename exclusion conservatively.",
         },
         "filenames": filename_overlap,
+        "verification": verification
     }
     with open(overlap_out, "w") as fh:
         json.dump(overlap_data, fh, indent=2)
@@ -339,7 +414,7 @@ def main() -> None:
     )
     write_manifest(
         out_dir / "d2_test_id.json", test_id_final, "Test_ID", d2_root,
-        ["H7: cross-split dups with Train removed", f"{len(testid_cross_removed)} files removed",
+        ["H7: cross-split dups with Train and Val removed", f"{len(testid_cross_removed) + len(testid_val_removed)} files removed",
          "D1 exclusions for OOD eval are separate (config/exclusion_list.json)"],
     )
     write_manifest(
@@ -347,7 +422,7 @@ def main() -> None:
         [
             "H8: within-split duplicates removed",
             f"{len(ood_removed)} files removed",
-            "IMPORTANT: D1 exclusions (config/exclusion_list.json) must ALSO be applied before eval (R7).",
+            "IMPORTANT: D1 exclusions (config/exclusion_list.json) are a secondary report only (D16). Primary OOD uses full deduped set.",
         ],
     )
     write_manifest(

@@ -70,7 +70,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 
 ## Implementation stages (only after Part 6 is approved)
 
-- [x] Data prep (C1) — 2026-10-10, all DoD items satisfied, 55 tests pass
+- [x] Data prep (C1) — 2026-10-10, all DoD items satisfied, 62/63 tests pass (1 skipped)
 - [ ] Vision (C2)
 - [ ] RAG (C3)
 - [ ] Weather (C4)
@@ -88,7 +88,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 |---|---|---|---|
 | I1 | CRITICAL | RAG knowledge base does not exist; zero documents collected | Open |
 | I2 | CRITICAL | No severity / lesion-mask annotations in either dataset; PPT severity claims unsupported | Resolved — severity_pct set to null with explanation (Part 2a-xi) |
-| I3 | HIGH | 47-file filename overlap between D2_Few_Shot and D2_Test_OOD; byte-identity not confirmed by perceptual hash | Open — verify with perceptual hash before any few-shot→OOD evaluation |
+| I3 | HIGH | 47-file filename overlap between D2_Few_Shot and D2_Test_OOD; byte-identity not confirmed by perceptual hash | Resolved — verified with perceptual hash; 0 of 47 are near-duplicates (different images with same filename). |
 | I4 | CRITICAL | 87.8% of D2_Test_OOD byte-identical to D1 images (1,972 train + 103 val); cross-dataset evaluation is confounded | Resolved — exclusion list specified; classifier MUST NOT train on D1 |
 | I5 | HIGH | D2_Train has 11 within-split duplicate pairs; D2_Train↔Val 4 leaks; D2_Train↔Test_ID 5 leaks | Resolved — dedup counts specified in preprocessing pipeline (Part 2a-iii) |
 | I6 | MEDIUM | D1 classes 27 (11 boxes) and 28 (2 boxes) are near-unusable for training and evaluation | Resolved — flagged; class 28 AP not gated (Part 2a-ix) |
@@ -97,7 +97,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | I9 | HIGH | Non-RGB images in D1_train (5 CMYK, 4 RGBA, 1 L) and D2_Test_OOD (4 CMYK, 4 RGBA, 1 L) | Resolved — force-convert to RGB at load time (Part 2a-iii) |
 | I10 | MEDIUM | D1 bbox character: whole-leaf, not lesion-level; PPT implies lesion-level detection | Resolved — documented in dataset_audit.md and Part 2a-xi |
 | I11 | LOW | D1 resolution spans 115–6000px; extreme variance | Resolved — letterbox to 640×640 (Part 2a-iii) |
-| I12 | MEDIUM | Effective OOD test set after exclusions is only ~299 images; per-class OOD metrics unreliable | Open — accepted limitation; report with caveat |
+| I12 | MEDIUM | Effective OOD test set after exclusions is only ~299 images; per-class OOD metrics unreliable | Open — effective OOD after exclusion is 283 images covering 7 of 30 classes (23 classes have zero). Note: Part 2/5 arithmetic 2,374-1,972-103=299 double-counted 10 files. Accepted limitation; report with caveat. |
 | I13 | LOW | D2 PlantVillage splits (Train/Val/Test_ID) not checked for near-duplicates via perceptual hash | Open (GAP) — 39K images, time-intensive |
 | I14 | HIGH | Weather disease-risk rules W01–W08 thresholds unverified by plant pathologist | Open — all weather contributions tagged [UNVERIFIED] |
 | I15 | MEDIUM | PPT mentions soil conditions and crop growth stage; no data or API exists | Open (GAP) — omitted from all schemas |
@@ -133,6 +133,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | D13 | LLM used only for RAG synthesis and Recommendation; all else deterministic or ML | [ENG] | 2026-10-01 | Part 3 principle |
 | D14 | Classifier trained exclusively on D2_Train; D1 images never in classifier pipeline | [DATA][ENG] | 2026-10-01 | I4, Part 2a-v |
 | D15 | Threat table uses GAP fallback (DISEASE_DETECTED=0.50) until pathologist fills it | [ENG][GAP] | 2026-10-01 | Part 4a-ii, I19 |
+| D16 | After applying config/exclusion_list.json, D2_Test_OOD has only 283 images covering 7 classes. Because the classifier is never trained on D1 (D14/R13), D1<->OOD overlap cannot leak into classifier evaluation. Primary OOD evaluation uses full deduped Test_OOD set. Exclusion-filtered set (283 images) is a secondary report only. Deviates from R7 as written. Exclusion filtering stays mandatory if any D1-trained model (e.g. YOLO) is evaluated on Test_OOD. | [ENG] | 2026-10-10 | I12 |
 
 ## Session Log
 
@@ -140,4 +141,4 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 |---|---|---|---|
 | 2026-10-01 | New chat after limit reset | plan.md created; awaiting repo check | Verify existing work, update statuses, resume at first unchecked item |
 | 2026-10-01 | Session 2 | Parts 1–5 written across multiple sessions | Part 6 |
-| 2026-10-10 | Session 4 (C1) | Implemented Stage C1 (Data Prep) in full. Folder structure created. .env.example, requirements.txt, src/schemas/schemas.py (exact spec copy), config/class_map_d1.json (29 classes), config/class_map_d2.json (30 classes), config/threat_table.json (all [GAP]), scripts/build_exclusion_list.py + config/exclusion_list.json (2,349 unique D1 hashes, DoD >=2,075 PASSED), scripts/build_split_manifests.py + 5 manifest JSONs + config/few_shot_test_ood_overlap.json (exactly 47 files), tests/unit/test_schemas.py (36 tests), tests/unit/test_exclusion_list.py (20 tests). 55 pass, 1 skipped. Deviations: (1) exclusion_list total=2,349 not 2,085 — spec's 2085 only counted D1<->OOD; combined with FewShot gives 2,349 (correct, logged); (2) Windows Unicode fix for console logging in both scripts; (3) manifests script slow (~8min for 42K files) due to OneDrive I/O. | C2 (Vision model training) when user says 'continue' |
+| 2026-10-10 | Session 4 (C1) | Implemented Stage C1 (Data Prep) in full. Folder structure created. schemas, threat table (healthy classes fixed), exclusion_list.json (2,349 hashes), and split manifests generated. Addressed 5 fixes: Val<->Test_ID leak removed (Test_ID=5,923), Test_OOD label-conflicting duplicates removed (Test_OOD=2,363), few_shot_test_ood_overlap.json verified via pHash (0 near-duplicates, 47 different images), absolute paths removed from manifests. Unit tests fully passing (62 passed, 1 skipped due to missing D1 files). | C2 (Vision model training) when user says 'continue' |

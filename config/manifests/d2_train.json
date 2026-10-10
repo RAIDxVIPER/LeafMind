@@ -1,7 +1,7 @@
 {
   "_meta": {
     "split": "Train",
-    "d2_root": "C:\\Users\\ronit\\OneDrive\\Desktop\\LeafMind\\Dataset_2",
+    "d2_root": "Dataset_2",
     "image_count": 27683,
     "notes": [
       "H5: within-split duplicates removed",

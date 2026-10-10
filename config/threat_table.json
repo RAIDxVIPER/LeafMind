@@ -20,24 +20,24 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Apple___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Blueberry___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Cherry___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Corn_(maize)___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Corn___Cercospora_leaf_spot": {
       "tier": "DISEASE_DETECTED",
@@ -65,14 +65,14 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Grape___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Peach___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Pepper,_bell___Bacterial_spot": {
       "tier": "DISEASE_DETECTED",
@@ -80,9 +80,9 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Pepper,_bell___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Potato___Early_blight": {
       "tier": "DISEASE_DETECTED",
@@ -95,19 +95,19 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Potato___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Raspberry___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Soybean___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Squash___Powdery_mildew": {
       "tier": "DISEASE_DETECTED",
@@ -115,9 +115,9 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Strawberry___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     },
     "Tomato___Bacterial_spot": {
       "tier": "DISEASE_DETECTED",
@@ -155,9 +155,9 @@
       "notes": "Pathologist review required. Fallback tier used."
     },
     "Tomato___healthy": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HEALTHY",
+      "status": "[ENG]",
+      "notes": "Marked as healthy class by engineering based on class name."
     }
   }
 }
