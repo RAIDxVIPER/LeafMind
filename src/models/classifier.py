@@ -30,6 +30,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import timm
 from PIL import Image, ImageFilter
 
@@ -492,3 +493,85 @@ def compute_ece(
         bin_frac = mask.sum() / n
         ece += abs(avg_conf - avg_acc) * bin_frac
     return float(ece)
+
+
+# ── Robust temperature fitting (Guo et al. 2017) ──────────────────────────────
+
+def fit_temperature(
+    logits: torch.Tensor,
+    labels: torch.Tensor,
+    max_iter: int = 50,
+) -> float:
+    """
+    Optimise temperature scalar T via LBFGS to minimise cross-entropy NLL.
+    Method: Guo et al. (2017) "On Calibration of Modern Neural Networks".
+
+    Optimises log_T (T = exp(log_T)) with LBFGS(lr=1.0, max_iter=50,
+    line_search_fn="strong_wolfe") on CPU float64 logits.
+
+    Safety guards:
+    - Clamps fitted T to [0.05, 20.0] and logs when clamped.
+    - Computes NLL at T=1.0 and at fitted T; returns fitted T only if its
+      NLL is strictly lower than NLL at T=1.0. Otherwise returns 1.0 and logs warning.
+    """
+    if not isinstance(logits, torch.Tensor):
+        logits = torch.as_tensor(logits)
+    if not isinstance(labels, torch.Tensor):
+        labels = torch.as_tensor(labels)
+
+    # Move to CPU float64 for stable numerical optimization
+    logits_64 = logits.detach().cpu().to(torch.float64)
+    labels_64 = labels.detach().cpu().to(torch.long)
+
+    criterion = nn.CrossEntropyLoss()
+    nll_t1 = float(criterion(logits_64, labels_64).item())
+
+    # Parameterize log_t so T = exp(log_t) is strictly positive
+    log_t = nn.Parameter(torch.zeros(1, dtype=torch.float64))
+    optimizer = optim.LBFGS(
+        [log_t],
+        lr=1.0,
+        max_iter=max_iter,
+        line_search_fn="strong_wolfe",
+    )
+
+    def closure():
+        optimizer.zero_grad()
+        t = torch.exp(log_t)
+        scaled = logits_64 / t
+        loss = criterion(scaled, labels_64)
+        loss.backward()
+        return loss
+
+    try:
+        optimizer.step(closure)
+    except Exception as exc:
+        logger.warning("LBFGS optimization error: %s. Falling back to T=1.0", exc)
+        return 1.0
+
+    raw_t = float(torch.exp(log_t).item())
+    fitted_t = raw_t
+
+    if fitted_t < 0.05:
+        logger.warning("Fitted temperature %.4f clamped to min 0.05", fitted_t)
+        fitted_t = 0.05
+    elif fitted_t > 20.0:
+        logger.warning("Fitted temperature %.4f clamped to max 20.0", fitted_t)
+        fitted_t = 20.0
+
+    nll_fitted = float(criterion(logits_64 / fitted_t, labels_64).item())
+
+    if nll_fitted < nll_t1:
+        logger.info(
+            "Temperature fitted: T=%.4f (NLL: %.4f -> %.4f, T=1.0 NLL=%.4f)",
+            fitted_t, nll_t1, nll_fitted, nll_t1
+        )
+        return fitted_t
+    else:
+        logger.warning(
+            "Fitted temperature %.4f yielded higher or equal NLL (%.6f >= %.6f at T=1.0). "
+            "Falling back to T=1.0",
+            fitted_t, nll_fitted, nll_t1
+        )
+        return 1.0
+

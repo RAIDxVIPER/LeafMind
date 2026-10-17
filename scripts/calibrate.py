@@ -59,6 +59,7 @@ from src.models.classifier import (
     EfficientNetB3Classifier,
     TemperatureScaler,
     compute_ece,
+    fit_temperature,
     resolve_image_path,   # Bug1: cross-platform backslash fix
 )
 
@@ -159,31 +160,11 @@ def optimise_temperature(
     max_iter: int = 50,
 ) -> float:
     """
-    Optimise temperature scalar T via LBFGS to minimise cross-entropy NLL.
-    Operates on pre-extracted raw logits (no network forward pass here).
+    Optimise temperature scalar T via fit_temperature (shared implementation).
     Method: Guo et al. (2017) -- single-scalar post-hoc calibration.
-    T > 1 softens; T < 1 sharpens.
-    Returns: optimised temperature (float, always > 0).
     """
-    scaler = TemperatureScaler(temperature=init_temp).to(logits.device)
-    labels = labels.to(logits.device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.LBFGS(
-        [scaler.temperature],
-        lr=0.01,
-        max_iter=max_iter,
-        line_search_fn="strong_wolfe",
-    )
+    return fit_temperature(logits, labels, max_iter=max_iter)
 
-    def closure():
-        optimizer.zero_grad()
-        scaled = scaler(logits)
-        loss = criterion(scaled, labels)
-        loss.backward()
-        return loss
-
-    optimizer.step(closure)
-    return float(scaler.temperature.item())
 
 
 # ── ECE helpers ───────────────────────────────────────────────────────────────

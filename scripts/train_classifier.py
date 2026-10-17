@@ -50,6 +50,7 @@ from src.models.classifier import (
     EfficientNetB3Classifier,
     compute_class_weights,
     compute_ece,
+    fit_temperature,
     resolve_image_path,   # Bug1: cross-platform backslash fix
 )
 
@@ -345,12 +346,11 @@ def calibrate_temperature(
     """
     Optimise temperature T on D2_Val by minimising NLL (negative log-likelihood).
     Method: Guo et al. (2017) [ENG -- single scalar post-hoc calibration].
+    Uses shared fit_temperature helper from src.models.classifier.
     T is optimised; backbone weights are FROZEN.
 
     Returns: optimised temperature T
     Target ECE < 0.05 is an [ENG assumption], not a literature-derived threshold [I24].
-    Bug3 fix: logits collected on CPU; optimisation happens entirely on CPU to
-    avoid CPU-parameter vs CUDA-tensor mismatch.
     """
     logger.info("Starting temperature calibration on D2_Val ...")
     model.eval()
@@ -367,30 +367,45 @@ def calibrate_temperature(
     all_logits  = torch.cat(all_logits)   # (N, num_classes) -- on CPU
     all_targets = torch.cat(all_targets)  # (N,)             -- on CPU
 
-    # Bug3: reset temperature parameter on CPU (logits are on CPU)
-    # Optimisation is cheap and device-agnostic because we work on CPU tensors.
-    model.scaler.temperature = nn.Parameter(
-        torch.tensor([temperature_init], dtype=torch.float32)  # CPU
-    )
-    optimiser = optim.LBFGS([model.scaler.temperature], lr=0.1, max_iter=max_iter)
+    # Pre-calibration metrics on D2_Val (T=1.0)
     criterion = nn.CrossEntropyLoss()
+    pre_nll = float(criterion(all_logits.to(torch.float64), all_targets.to(torch.long)).item())
+    probs_pre = torch.softmax(all_logits.to(torch.float64), dim=1).numpy()
+    confs_pre = probs_pre.max(axis=1)
+    preds_pre = probs_pre.argmax(axis=1)
+    corr_pre = (preds_pre == all_targets.numpy()).astype(float)
+    pre_ece = compute_ece(confs_pre, corr_pre)
 
-    def _closure():
-        optimiser.zero_grad()
-        # All tensors are on CPU; no .to(device) needed
-        scaled = all_logits / model.scaler.temperature.clamp(min=1e-6)
-        loss   = criterion(scaled, all_targets)
-        loss.backward()
-        return loss
+    # Use shared robust fit_temperature
+    t_optimised = fit_temperature(all_logits, all_targets, max_iter=max_iter)
 
-    optimiser.step(_closure)
+    # Post-calibration metrics on D2_Val
+    post_nll = float(criterion(all_logits.to(torch.float64) / t_optimised, all_targets.to(torch.long)).item())
+    probs_post = torch.softmax(all_logits.to(torch.float64) / t_optimised, dim=1).numpy()
+    confs_post = probs_post.max(axis=1)
+    preds_post = probs_post.argmax(axis=1)
+    corr_post = (preds_post == all_targets.numpy()).astype(float)
+    post_ece = compute_ece(confs_post, corr_post)
 
-    t_optimised = float(model.scaler.temperature.item())
+    logger.info(
+        "D2_Val Calibration: T=%.4f | Pre-cal: NLL=%.4f ECE=%.4f | Post-cal: NLL=%.4f ECE=%.4f",
+        t_optimised, pre_nll, pre_ece, post_nll, post_ece
+    )
+
     # Move the calibrated parameter back to the model's device so forward passes work
     model.scaler.temperature = nn.Parameter(
         torch.tensor([t_optimised], dtype=torch.float32, device=device)
     )
-    logger.info("Calibration complete: T=%.4f", t_optimised)
+
+    # Save calibration stats on model for metrics.json
+    model._cal_stats = {
+        "temperature": t_optimised,
+        "pre_nll": round(pre_nll, 6),
+        "post_nll": round(post_nll, 6),
+        "pre_ece": round(pre_ece, 6),
+        "post_ece": round(post_ece, 6),
+    }
+
     return t_optimised
 
 
@@ -830,10 +845,23 @@ def main():
     print("=" * 60)
 
     # ── Save metrics JSON ─────────────────────────────────────────────────────
+    cal_stats = getattr(model, "_cal_stats", {})
     metrics_out = {
         "model_version": model_version,
         "temperature": temperature,
         "temperature_note": "T fitted on D2_Val only; OOD ECE expected worse due to domain shift [Bug8/ENG/DATA]",
+        "calibration": {
+            "temperature": temperature,
+            "pre_nll": cal_stats.get("pre_nll"),
+            "post_nll": cal_stats.get("post_nll"),
+            "pre_ece": cal_stats.get("pre_ece"),
+            "post_ece": cal_stats.get("post_ece"),
+            "ece_target": float(cfg.get("calibration", {}).get("ece_target", 0.05)),
+            "ece_target_met": (
+                bool(cal_stats["post_ece"] < float(cfg.get("calibration", {}).get("ece_target", 0.05)))
+                if cal_stats.get("post_ece") is not None else None
+            ),
+        },
         "best_epoch": best_epoch,
         "splits": {},
         "ood_gap_primary": ood_gap,

@@ -751,6 +751,26 @@ class TestBug3CalibrateTemperatureDevice:
             "model.scaler.temperature must be on CPU after calibration on CPU [Bug3]"
         )
 
+    def test_calibrate_temperature_sets_cal_stats(self):
+        """calibrate_temperature records pre/post NLL and ECE in model._cal_stats."""
+        from scripts.train_classifier import calibrate_temperature
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        model = EfficientNetB3Classifier(num_classes=4, pretrained=False).to(device)
+        inputs  = torch.randn(16, 3, 224, 224)
+        targets = torch.randint(0, 4, (16,))
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=8)
+
+        t = calibrate_temperature(model, loader, device, max_iter=5)
+        assert hasattr(model, "_cal_stats")
+        stats = model._cal_stats
+        assert "pre_nll" in stats and "post_nll" in stats
+        assert "pre_ece" in stats and "post_ece" in stats
+        assert stats["temperature"] == t
+
 
 class TestBug4CheckpointTemperatureRoundTrip:
     """Bug4: from_checkpoint must load temperature from temperature.json and override state dict."""
@@ -1031,3 +1051,108 @@ class TestBug8ECECaveat:
         assert "OOD ECE" in source or "OOD_ECE" in source or "domain shift" in source, (
             "train_classifier.main must document OOD ECE caveat (T fitted on D2_Val) [Bug8]"
         )
+
+
+class TestFitTemperature:
+    """Synthetic tests for fit_temperature in src/models/classifier.py."""
+
+    @pytest.fixture
+    def synthetic_data(self):
+        """Generate base logits and labels sampled from softmax(base)."""
+        torch.manual_seed(42)
+        np.random.seed(42)
+        n_samples = 3000
+        n_classes = 10
+        base_logits = torch.randn(n_samples, n_classes, dtype=torch.float64) * 2.0
+        probs = torch.softmax(base_logits, dim=1)
+        labels = torch.multinomial(probs, num_samples=1).squeeze(1)
+        return base_logits, labels
+
+    def test_overconfident_logits_fitted_t_near_3(self, synthetic_data):
+        """(a) logits * 3 -> fitted T within 20% of 3."""
+        from src.models.classifier import fit_temperature
+        base_logits, labels = synthetic_data
+        t_fitted = fit_temperature(base_logits * 3.0, labels)
+        expected = 3.0
+        rel_diff = abs(t_fitted - expected) / expected
+        assert rel_diff < 0.20, f"Expected T within 20% of 3.0, got {t_fitted:.4f} (diff={rel_diff:.2%})"
+
+    def test_underconfident_logits_fitted_t_near_half(self, synthetic_data):
+        """(b) logits / 2 -> fitted T within 20% of 0.5."""
+        from src.models.classifier import fit_temperature
+        base_logits, labels = synthetic_data
+        t_fitted = fit_temperature(base_logits / 2.0, labels)
+        expected = 0.5
+        rel_diff = abs(t_fitted - expected) / expected
+        assert rel_diff < 0.20, f"Expected T within 20% of 0.5, got {t_fitted:.4f} (diff={rel_diff:.2%})"
+
+    def test_ece_improves_after_calibration_for_both(self, synthetic_data):
+        """(c) ECE after < ECE before for both overconfident and underconfident logits."""
+        from src.models.classifier import compute_ece, fit_temperature
+        base_logits, labels = synthetic_data
+        targets_np = labels.numpy()
+
+        for scale in [3.0, 0.5]:
+            scaled_logits = base_logits * scale
+            t_fitted = fit_temperature(scaled_logits, labels)
+
+            # ECE before (T=1.0)
+            probs_before = torch.softmax(scaled_logits, dim=1).numpy()
+            confs_before = probs_before.max(axis=1)
+            preds_before = probs_before.argmax(axis=1)
+            corr_before = (preds_before == targets_np).astype(float)
+            ece_before = compute_ece(confs_before, corr_before)
+
+            # ECE after (T=t_fitted)
+            probs_after = torch.softmax(scaled_logits / t_fitted, dim=1).numpy()
+            confs_after = probs_after.max(axis=1)
+            preds_after = probs_after.argmax(axis=1)
+            corr_after = (preds_after == targets_np).astype(float)
+            ece_after = compute_ece(confs_after, corr_after)
+
+            assert ece_after < ece_before, (
+                f"For scale={scale}, ECE after ({ece_after:.4f}) should be strictly less than "
+                f"ECE before ({ece_before:.4f}) with T={t_fitted:.4f}"
+            )
+
+    def test_already_calibrated_logits_t_near_1(self, synthetic_data):
+        """(d) already calibrated -> T between 0.8 and 1.25."""
+        from src.models.classifier import fit_temperature
+        base_logits, labels = synthetic_data
+        t_fitted = fit_temperature(base_logits, labels)
+        assert 0.8 <= t_fitted <= 1.25, f"Expected T between 0.8 and 1.25 for calibrated logits, got {t_fitted:.4f}"
+
+    def test_worse_nll_returns_one(self, monkeypatch, synthetic_data):
+        """(e) if the optimiser returns a worse-NLL T, the function returns 1.0."""
+        from src.models.classifier import fit_temperature
+        import torch.optim as optim
+        base_logits, labels = synthetic_data
+
+        class BadLBFGS:
+            def __init__(self, params, *args, **kwargs):
+                self.params = list(params)
+            def step(self, closure):
+                for p in self.params:
+                    p.data.fill_(5.0)
+
+        monkeypatch.setattr(optim, "LBFGS", BadLBFGS)
+        t_result = fit_temperature(base_logits, labels)
+        assert t_result == 1.0, f"Expected fallback T=1.0 when optimizer yields worse NLL, got {t_result}"
+
+    def test_clamped_temperature_bounds(self, monkeypatch, synthetic_data):
+        """Fitted T is clamped to [0.05, 20.0]."""
+        from src.models.classifier import fit_temperature
+        import torch.optim as optim
+        base_logits, labels = synthetic_data
+
+        class LowLBFGS:
+            def __init__(self, params, *args, **kwargs):
+                self.params = list(params)
+            def step(self, closure):
+                for p in self.params:
+                    p.data.fill_(-10.0)
+
+        monkeypatch.setattr(optim, "LBFGS", LowLBFGS)
+        t_low = fit_temperature(base_logits, labels)
+        assert t_low in [0.05, 1.0]
+
