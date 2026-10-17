@@ -71,7 +71,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 ## Implementation stages (only after Part 6 is approved)
 
 - [x] Data prep (C1) — 2026-10-10, all DoD items satisfied, 62/63 tests pass (1 skipped)
-- [ ] Vision (C2)
+- [~] Vision (C2) -- code + smoke test done; full GPU training pending
 - [ ] RAG (C3)
 - [ ] Weather (C4)
 - [ ] Risk (C5)
@@ -142,3 +142,4 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | 2026-10-01 | New chat after limit reset | plan.md created; awaiting repo check | Verify existing work, update statuses, resume at first unchecked item |
 | 2026-10-01 | Session 2 | Parts 1–5 written across multiple sessions | Part 6 |
 | 2026-10-10 | Session 4 (C1) | Implemented Stage C1 (Data Prep) in full. Folder structure created. schemas, threat table (healthy classes fixed), exclusion_list.json (2,349 hashes), and split manifests generated. Addressed 5 fixes: Val<->Test_ID leak removed (Test_ID=5,923), Test_OOD label-conflicting duplicates removed (Test_OOD=2,363), few_shot_test_ood_overlap.json verified via pHash (0 near-duplicates, 47 different images), absolute paths removed from manifests. Unit tests fully passing (62 passed, 1 skipped due to missing D1 files). | C2 (Vision model training) when user says 'continue' |
+| 2026-10-17 | Session 5 (C2 resume) | Resumed C2 after interruption. State: all C2 source files existed (classifier.py, vision_agent.py, vision.py, train_classifier.py, smoke_test_classifier.py). Missing: scripts/calibrate.py. ECE test was already correct (conf=acc=0.7 -> ECE=0). Created scripts/calibrate.py (temperature scaling on D2_Val, LBFGS, writes temperature.json + calibration_metrics.json; D14 enforced, I9 enforced, I27 enforced). Smoke test PASSED (RGB/CMYK/RGBA/L inputs, severity_pct=None, low_resolution flag, VisionOutput schema). Full pytest: 118 passed, 1 skipped (C1 baseline was 63p/1s; C2 added 55 tests). No absolute paths in src/scripts/tests. | C3 (RAG stub) when user says 'continue' |

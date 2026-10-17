@@ -1,202 +1,740 @@
-import json
-import os
+"""
+scripts/train_classifier.py
+============================
+Full EfficientNet-B3 training script for LeafMind C2 (Vision Classifier).
+
+Designed for GPU execution on Kaggle or Google Colab.
+DO NOT run locally with full data -- use scripts/smoke_test_classifier.py for local testing.
+
+Usage (GPU, e.g. Kaggle/Colab):
+    python scripts/train_classifier.py --data-root /path/to/Dataset_2 --epochs 30
+
+Key design decisions (see config/classifier_config.yaml for all values):
+  [D14/R13] D1 images NEVER enter the classifier training pipeline
+  [ENG]     Weighted cross-entropy loss handles ~35.4x class imbalance
+  [ENG]     Augmentation targets lab-to-field domain gap (ColorJitter, blur, etc.)
+  [ENG]     Temperature scaling calibrated on D2_Val after training
+  [D16]     OOD evaluation uses full deduped Test_OOD as primary;
+            exclusion-filtered (283 images) reported as secondary only
+  [R1]      No fabricated numbers -- all metrics computed from actual data
+  [R3]      severity_pct is ALWAYS None -- never computed or stored
+  [I27]     ASCII-only console output
+
+All threshold values are [ENG assumption] and tagged in code comments.
+"""
+from __future__ import annotations
+
 import argparse
+import json
+import logging
+import os
+import random
+import sys
+import time
+from collections import Counter
 from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, models
 from PIL import Image
-from sklearn.metrics import f1_score
-from tqdm import tqdm
-import math
-import numpy as np
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
-REPO_ROOT = Path(__file__).parent.parent
-MANIFESTS_DIR = REPO_ROOT / 'config' / 'manifests'
-EXCLUSION_FILE = REPO_ROOT / 'config' / 'exclusion_list.json'
-CLASS_MAP_FILE = REPO_ROOT / 'config' / 'class_map_d2.json'
-D2_ROOT = REPO_ROOT / 'Dataset_2'
+# Project imports (repo root must be on PYTHONPATH)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
-class LeafDataset(Dataset):
-    def __init__(self, images_list, d2_root, transform=None, class_map=None):
-        self.images = images_list
-        self.d2_root = Path(d2_root)
-        self.transform = transform
-        self.class_map = class_map
-            
-    def __len__(self):
-        return len(self.images)
-        
-    def __getitem__(self, idx):
-        item = self.images[idx]
-        img_path = self.d2_root / item['path']
-        label_name = item['class']
-        label = self.class_map[label_name]
-        
-        img = Image.open(img_path).convert('RGB')
+from src.models.classifier import (
+    EfficientNetB3Classifier,
+    compute_class_weights,
+    compute_ece,
+)
+
+# ── ASCII-only logging [I27] ─────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("train_classifier")
+
+# ── Paths (all relative, resolved at runtime -- no absolute paths in code) ────
+MANIFESTS_DIR = REPO_ROOT / "config" / "manifests"
+CLASS_MAP_FILE = REPO_ROOT / "config" / "class_map_d2.json"
+EXCLUSION_FILE = REPO_ROOT / "config" / "exclusion_list.json"
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+
+class D2Dataset(Dataset):
+    """
+    Dataset backed by the deduplicated split manifests from C1.
+
+    Images are sourced from D2 (PlantVillage + PlantDoc classification dataset) ONLY.
+    D1 images are NEVER used in this dataset [D14/R13].
+    RGB conversion is forced at load time to handle CMYK/RGBA/L modes [I9].
+    """
+
+    def __init__(
+        self,
+        image_list: list,   # list of {"path": str, "class": str, "md5": str}
+        data_root: Path,
+        transform=None,
+        label_to_idx: dict = None,
+    ):
+        self.image_list   = image_list
+        self.data_root    = Path(data_root)
+        self.transform    = transform
+        self.label_to_idx = label_to_idx or {}
+
+    def __len__(self) -> int:
+        return len(self.image_list)
+
+    def __getitem__(self, idx: int):
+        entry      = self.image_list[idx]
+        img_path   = self.data_root / entry["path"]
+        label_name = entry["class"]
+        label_idx  = self.label_to_idx[label_name]
+
+        # Force RGB -- handles CMYK, RGBA, L [I9]
+        try:
+            img = Image.open(img_path)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+        except Exception as exc:
+            logger.warning("Skipping corrupt image %s: %s", img_path, exc)
+            # Return a blank tensor rather than crashing
+            img = Image.new("RGB", (224, 224), color=0)
+
         if self.transform:
             img = self.transform(img)
-            
-        return img, label
 
-def ece_score(preds, targets, confidences, n_bins=15):
-    bin_boundaries = np.linspace(0, 1, n_bins + 1)
-    bin_lowers = bin_boundaries[:-1]
-    bin_uppers = bin_boundaries[1:]
-    
-    ece = 0.0
-    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        in_bin = (confidences > bin_lower) & (confidences <= bin_upper)
-        prop_in_bin = in_bin.mean()
-        if prop_in_bin > 0:
-            accuracy_in_bin = (preds[in_bin] == targets[in_bin]).mean()
-            avg_confidence_in_bin = confidences[in_bin].mean()
-            ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
-    return ece
+        return img, label_idx
 
-class ModelWithTemperature(nn.Module):
-    def __init__(self, model):
-        super(ModelWithTemperature, self).__init__()
-        self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1.5)
 
-    def forward(self, input):
-        logits = self.model(input)
-        return logits / self.temperature
+# ── Augmentation transforms ───────────────────────────────────────────────────
 
-def evaluate(model, loader, device, desc="Eval"):
+def build_train_transform(cfg: dict) -> transforms.Compose:
+    """
+    Training augmentation pipeline targeting lab-to-field domain gap [ENG spec 2a-iv].
+    Applied ONLY to training images -- never to val/test [DATA].
+    """
+    aug = cfg.get("augmentation", {})
+    cj  = aug.get("color_jitter", {})
+    rrc = aug.get("random_resized_crop", {})
+    blur_k = aug.get("gaussian_blur_kernel", [3, 7])
+    # kernel must be odd; choose one value in range
+    kernel = blur_k[0] if blur_k[0] % 2 == 1 else blur_k[0] + 1
+
+    input_size = cfg.get("model", {}).get("input_size", 224)
+    resize_to  = int(input_size * 256 / 224)
+
+    return transforms.Compose([
+        # RandomResizedCrop first -- scale variation simulates field zoom [ENG]
+        transforms.RandomResizedCrop(
+            input_size,
+            scale=(rrc.get("scale_min", 0.7), rrc.get("scale_max", 1.0)),
+        ),
+        transforms.RandomHorizontalFlip(p=aug.get("horizontal_flip_p", 0.5)),   # [ENG]
+        transforms.RandomVerticalFlip(p=aug.get("vertical_flip_p", 0.3)),       # [ENG]
+        transforms.RandomRotation(degrees=aug.get("rotation_degrees", 30)),     # [ENG]
+        transforms.ColorJitter(                                                  # [ENG] domain gap
+            brightness=cj.get("brightness", 0.3),
+            contrast=cj.get("contrast", 0.3),
+            saturation=cj.get("saturation", 0.3),
+            hue=cj.get("hue", 0.1),
+        ),
+        transforms.RandomGrayscale(p=aug.get("grayscale_p", 0.05)),             # [ENG]
+        transforms.GaussianBlur(
+            kernel_size=kernel,
+            sigma=(0.1, 2.0),
+        ) if random.random() < aug.get("gaussian_blur_p", 0.2) else transforms.Lambda(lambda x: x),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=cfg.get("normalization", {}).get("mean", [0.485, 0.456, 0.406]),
+            std=cfg.get("normalization", {}).get("std",  [0.229, 0.224, 0.225]),
+        ),
+    ])
+
+
+def build_eval_transform(cfg: dict) -> transforms.Compose:
+    """
+    Inference-time transform: resize + centre-crop + normalise. No augmentation.
+    Applied identically to Val, Test_ID, Test_OOD.
+    """
+    input_size = cfg.get("model", {}).get("input_size", 224)
+    resize_to  = int(input_size * 256 / 224)
+    norm       = cfg.get("normalization", {})
+    return transforms.Compose([
+        transforms.Resize(resize_to),
+        transforms.CenterCrop(input_size),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=norm.get("mean", [0.485, 0.456, 0.406]),
+            std=norm.get("std",  [0.229, 0.224, 0.225]),
+        ),
+    ])
+
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+
+def evaluate_split(
+    model: nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+    idx_to_label: dict,
+    split_name: str,
+) -> dict:
+    """
+    Evaluate model on a single data split.
+    Returns dict with macro_f1, per_class_f1, ece, top1_acc, and raw arrays.
+
+    All returned numbers are computed from actual data [R1].
+    No numbers are hardcoded or fabricated.
+    """
+    from sklearn.metrics import (
+        classification_report,
+        confusion_matrix,
+        f1_score,
+    )
+
     model.eval()
-    all_preds = []
-    all_targets = []
-    all_confs = []
-    
+    all_preds, all_targets, all_confs = [], [], []
+
     with torch.no_grad():
-        for inputs, targets in tqdm(loader, desc=desc):
-            inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            probs = torch.softmax(logits, dim=1)
-            confs, preds = torch.max(probs, dim=1)
-            
+        for inputs, targets in loader:
+            inputs  = inputs.to(device)
+            logits  = model(inputs, calibrate=True)  # temperature-scaled
+            probs   = torch.softmax(logits, dim=1)
+            confs, preds = probs.max(dim=1)
             all_preds.extend(preds.cpu().numpy())
             all_targets.extend(targets.cpu().numpy())
             all_confs.extend(confs.cpu().numpy())
-            
-    preds = np.array(all_preds)
+
+    preds   = np.array(all_preds)
     targets = np.array(all_targets)
-    confs = np.array(all_confs)
-    
-    macro_f1 = f1_score(targets, preds, average='macro')
-    ece = ece_score(preds, targets, confs)
-    
-    # per-class F1
-    per_class_f1 = f1_score(targets, preds, average=None)
-    
-    return macro_f1, ece, per_class_f1
+    confs   = np.array(all_confs)
+    correct = (preds == targets).astype(float)
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=1, help='Epochs to run (default 1 for demo)')
-    parser.add_argument('--batch-size', type=int, default=32)
-    args = parser.parse_args()
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    
-    # Load class map
-    with open(CLASS_MAP_FILE) as f:
-        data = json.load(f)
-    
-    # Invert the mapping: class_name -> int ID
-    class_map = {v: int(k) for k, v in data['classes'].items()}
-    num_classes = len(class_map)
-    print(f"Classes: {num_classes}")
+    n       = len(targets)
+    num_cls = len(idx_to_label)
+    labels  = list(range(num_cls))
 
-    # Load manifests
-    def load_manifest(split):
-        with open(MANIFESTS_DIR / f'd2_{split}.json') as f:
-            return json.load(f)['images']
-            
-    train_imgs = load_manifest('train')
-    val_imgs = load_manifest('val')
-    test_id_imgs = load_manifest('test_id')
-    test_ood_imgs = load_manifest('test_ood')
-    
-    # Filtered Test OOD
-    with open(EXCLUSION_FILE) as f:
-        excluded_md5s = set(json.load(f)['excluded_md5s'])
-        
-    test_ood_filtered_imgs = [img for img in test_ood_imgs if img['md5'] not in excluded_md5s]
-    
-    print(f"Train: {len(train_imgs)}, Val: {len(val_imgs)}, Test_ID: {len(test_id_imgs)}")
-    print(f"Test_OOD Full: {len(test_ood_imgs)}, Filtered: {len(test_ood_filtered_imgs)}")
+    macro_f1     = float(f1_score(targets, preds, average="macro", zero_division=0, labels=labels))
+    top1_acc     = float(correct.mean())
+    ece          = compute_ece(confs, correct)
+    per_cls_f1   = f1_score(targets, preds, average=None, zero_division=0, labels=labels)
+    conf_mat     = confusion_matrix(targets, preds, labels=labels)
 
-    # Transforms
-    train_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-    val_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
+    logger.info(
+        "[%s] n=%d top1_acc=%.4f macro_F1=%.4f ECE=%.4f",
+        split_name, n, top1_acc, macro_f1, ece
+    )
 
-    train_ds = LeafDataset(train_imgs, D2_ROOT, train_transform, class_map)
-    val_ds = LeafDataset(val_imgs, D2_ROOT, val_transform, class_map)
-    test_id_ds = LeafDataset(test_id_imgs, D2_ROOT, val_transform, class_map)
-    test_ood_full_ds = LeafDataset(test_ood_imgs, D2_ROOT, val_transform, class_map)
-    test_ood_filt_ds = LeafDataset(test_ood_filtered_imgs, D2_ROOT, val_transform, class_map)
-    
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
-    test_id_loader = DataLoader(test_id_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
-    test_ood_full_loader = DataLoader(test_ood_full_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
-    test_ood_filt_loader = DataLoader(test_ood_filt_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
+    return {
+        "split": split_name,
+        "n_images": n,
+        "top1_accuracy": top1_acc,
+        "macro_f1": macro_f1,
+        "ece": ece,
+        "per_class_f1": per_cls_f1.tolist(),
+        "confusion_matrix": conf_mat.tolist(),
+        "preds": preds,
+        "targets": targets,
+        "confs": confs,
+    }
 
-    # Model
-    base_model = models.efficientnet_b3(weights=models.EfficientNet_B3_Weights.IMAGENET1K_V1)
-    base_model.classifier[1] = nn.Linear(base_model.classifier[1].in_features, num_classes)
-    
-    # We wrap it with temperature scaling
-    model = ModelWithTemperature(base_model)
-    model.to(device)
-    
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+# ── Temperature calibration ───────────────────────────────────────────────────
+
+def calibrate_temperature(
+    model: EfficientNetB3Classifier,
+    val_loader: DataLoader,
+    device: torch.device,
+    temperature_init: float = 1.5,
+    max_iter: int = 50,
+) -> float:
+    """
+    Optimise temperature T on D2_Val by minimising NLL (negative log-likelihood).
+    Method: Guo et al. (2017) [ENG -- single scalar post-hoc calibration].
+    T is optimised; backbone weights are FROZEN.
+
+    Returns: optimised temperature T
+    Target ECE < 0.05 is an [ENG assumption], not a literature-derived threshold [I24].
+    """
+    logger.info("Starting temperature calibration on D2_Val ...")
+    model.eval()
+
+    # Collect raw logits from backbone (before temperature scaling)
+    all_logits, all_targets = [], []
+    with torch.no_grad():
+        for inputs, targets in val_loader:
+            inputs = inputs.to(device)
+            logits = model.backbone(inputs)   # raw logits, no temperature
+            all_logits.append(logits.cpu())
+            all_targets.append(targets)
+
+    all_logits  = torch.cat(all_logits)   # (N, num_classes)
+    all_targets = torch.cat(all_targets)  # (N,)
+
+    # Reset temperature parameter and optimise
+    model.scaler.temperature = nn.Parameter(
+        torch.tensor([temperature_init], dtype=torch.float32)
+    )
+    optimiser = optim.LBFGS([model.scaler.temperature], lr=0.1, max_iter=max_iter)
     criterion = nn.CrossEntropyLoss()
 
-    for epoch in range(args.epochs):
-        model.train()
-        running_loss = 0.0
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs} Train")
-        for inputs, targets in pbar:
-            inputs, targets = inputs.to(device), targets.to(device)
-            optimizer.zero_grad()
-            logits = model(inputs)
-            loss = criterion(logits, targets)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-            pbar.set_postfix({'loss': f"{loss.item():.4f}"})
-            
-    # Evaluation
-    print("\n--- Evaluation ---")
-    val_macro_f1, val_ece, _ = evaluate(model, val_loader, device, "Val")
-    print(f"Val -> Macro F1: {val_macro_f1:.4f}, ECE: {val_ece:.4f}")
-    
-    test_id_macro_f1, test_id_ece, _ = evaluate(model, test_id_loader, device, "Test_ID")
-    print(f"Test_ID -> Macro F1: {test_id_macro_f1:.4f}, ECE: {test_id_ece:.4f}")
-    
-    test_ood_f_macro_f1, test_ood_f_ece, _ = evaluate(model, test_ood_full_loader, device, "Test_OOD (Full)")
-    print(f"Test_OOD (Full, D16) -> Macro F1: {test_ood_f_macro_f1:.4f}, ECE: {test_ood_f_ece:.4f}")
-    
-    test_ood_filt_macro_f1, test_ood_filt_ece, filt_pc = evaluate(model, test_ood_filt_loader, device, "Test_OOD (Filtered)")
-    print(f"Test_OOD (Filtered) -> Macro F1: {test_ood_filt_macro_f1:.4f}, ECE: {test_ood_filt_ece:.4f}")
-    
-    print("\nTraining Complete. Model is not saved in this demo run.")
+    def _closure():
+        optimiser.zero_grad()
+        scaled = all_logits.to(device) / model.scaler.temperature.clamp(min=1e-6)
+        loss   = criterion(scaled, all_targets.to(device))
+        loss.backward()
+        return loss
 
-if __name__ == '__main__':
+    optimiser.step(_closure)
+
+    t_optimised = float(model.scaler.temperature.item())
+    logger.info("Calibration complete: T=%.4f", t_optimised)
+    return t_optimised
+
+
+# ── Main training loop ────────────────────────────────────────────────────────
+
+def load_config(config_path: Path) -> dict:
+    """Load YAML config; fallback to defaults if yaml not installed."""
+    try:
+        import yaml
+        with open(config_path) as f:
+            return yaml.safe_load(f)
+    except ImportError:
+        logger.warning("PyYAML not installed -- using hardcoded defaults")
+        return {}
+
+
+def set_seeds(seed: int):
+    """Fixed seed for reproducibility [R1]."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="LeafMind C2 -- EfficientNet-B3 classifier training (GPU)"
+    )
+    parser.add_argument(
+        "--data-root", type=str, default=None,
+        help="Path to Dataset_2 directory. Overrides config paths.data_root."
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=None,
+        help="Number of training epochs. Overrides config."
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=None,
+        help="Batch size. Overrides config."
+    )
+    parser.add_argument(
+        "--config", type=str,
+        default=str(REPO_ROOT / "config" / "classifier_config.yaml"),
+        help="Path to classifier_config.yaml"
+    )
+    parser.add_argument(
+        "--checkpoint-dir", type=str, default=None,
+        help="Override checkpoint output directory."
+    )
+    parser.add_argument(
+        "--resume", type=str, default=None,
+        help="Path to checkpoint .pth to resume training from."
+    )
+    parser.add_argument(
+        "--no-calibrate", action="store_true",
+        help="Skip temperature calibration step."
+    )
+    parser.add_argument(
+        "--max-train-images", type=int, default=None,
+        help="Limit training set size (for 1-epoch real-data dry run)."
+    )
+    parser.add_argument(
+        "--max-val-images", type=int, default=None,
+        help="Limit validation set size (for 1-epoch real-data dry run)."
+    )
+    parser.add_argument(
+        "--max-test-images", type=int, default=None,
+        help="Limit Test_ID and Test_OOD set size (for 1-epoch real-data dry run)."
+    )
+    args = parser.parse_args()
+
+    # ── Load config ───────────────────────────────────────────────────────────
+    cfg = load_config(Path(args.config))
+
+    # CLI overrides
+    if args.data_root:
+        cfg.setdefault("paths", {})["data_root"] = args.data_root
+    if args.epochs:
+        cfg.setdefault("training", {})["epochs"] = args.epochs
+    if args.batch_size:
+        cfg.setdefault("training", {})["batch_size"] = args.batch_size
+    if args.checkpoint_dir:
+        cfg.setdefault("paths", {})["checkpoint_dir"] = args.checkpoint_dir
+
+    train_cfg = cfg.get("training", {})
+    paths_cfg = cfg.get("paths", {})
+
+    seed       = int(train_cfg.get("seed", 42))
+    epochs     = int(train_cfg.get("epochs", 30))
+    batch_size = int(train_cfg.get("batch_size", 64))
+    lr         = float(train_cfg.get("learning_rate", 1e-4))
+    wd         = float(train_cfg.get("weight_decay", 1e-4))
+    patience   = int(train_cfg.get("early_stopping_patience", 5))
+    warmup_ep  = int(train_cfg.get("warmup_epochs", 2))
+    num_workers = int(cfg.get("dataloader", {}).get("num_workers", 4))
+    pin_memory  = bool(cfg.get("dataloader", {}).get("pin_memory", True))
+
+    data_root    = Path(paths_cfg.get("data_root", "Dataset_2"))
+    if not data_root.is_absolute():
+        data_root = REPO_ROOT / data_root
+
+    ckpt_dir  = Path(paths_cfg.get("checkpoint_dir", "checkpoints/classifier"))
+    if not ckpt_dir.is_absolute():
+        ckpt_dir = REPO_ROOT / ckpt_dir
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    set_seeds(seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info("Device: %s | Seed: %d | Epochs: %d | Batch: %d", device, seed, epochs, batch_size)
+
+    if device.type == "cpu":
+        logger.warning(
+            "No GPU detected. Full training on CPU is very slow. "
+            "Use scripts/smoke_test_classifier.py for local CPU testing. "
+            "Run full training on Kaggle/Colab with GPU."
+        )
+
+    # ── Load class map ────────────────────────────────────────────────────────
+    with open(REPO_ROOT / paths_cfg.get("class_map", "config/class_map_d2.json")) as f:
+        raw_map = json.load(f)
+    idx_to_label  = {int(k): v for k, v in raw_map["classes"].items()}
+    label_to_idx  = {v: k for k, v in idx_to_label.items()}
+    num_classes   = len(idx_to_label)
+    logger.info("Loaded %d classes from class_map_d2.json", num_classes)
+
+    # ── Load manifests (C1 deduplicated -- D1 images NEVER present) [D14] ────
+    def load_manifest(split_name: str) -> list:
+        fp = REPO_ROOT / paths_cfg.get("manifests_dir", "config/manifests") / f"d2_{split_name}.json"
+        with open(fp) as f:
+            return json.load(f)["images"]
+
+    train_images = load_manifest("train")
+    val_images   = load_manifest("val")
+    test_id_imgs = load_manifest("test_id")
+    test_ood_imgs = load_manifest("test_ood")
+
+    # Load exclusion list for OOD filtered evaluation [R7/D16]
+    excl_path = REPO_ROOT / paths_cfg.get("exclusion_list", "config/exclusion_list.json")
+    with open(excl_path) as f:
+        excl_md5s = set(json.load(f)["excluded_md5s"])
+
+    # [D16] Primary OOD evaluation: full deduped Test_OOD (no exclusion)
+    # Secondary OOD evaluation: exclusion-filtered set (covering only 7 classes, ~283 images)
+    test_ood_filtered = [img for img in test_ood_imgs if img["md5"] not in excl_md5s]
+    logger.info(
+        "OOD: full=%d | exclusion-filtered=%d (secondary, covers 7 classes [D16/I12])",
+        len(test_ood_imgs), len(test_ood_filtered)
+    )
+    logger.info(
+        "CAVEAT: OOD exclusion-filtered set covers only 7 of 30 classes. "
+        "Per-class OOD metrics are unreliable [I12]. Primary evaluation uses full deduped OOD set [D16]."
+    )
+
+    # Subset limits for 1-epoch real-data dry run (not used in production)
+    if args.max_train_images:
+        train_images = train_images[: args.max_train_images]
+        logger.info("DRY-RUN: Limited training to %d images", len(train_images))
+    if args.max_val_images:
+        val_images = val_images[: args.max_val_images]
+        logger.info("DRY-RUN: Limited validation to %d images", len(val_images))
+    if args.max_test_images:
+        test_id_imgs  = test_id_imgs[: args.max_test_images]
+        test_ood_imgs = test_ood_imgs[: args.max_test_images]
+        # Re-apply OOD exclusion filter on the trimmed set
+        test_ood_filtered = [img for img in test_ood_imgs if img["md5"] not in excl_md5s]
+        logger.info("DRY-RUN: Limited Test_ID and Test_OOD to %d images each", args.max_test_images)
+
+    logger.info(
+        "Split sizes: Train=%d Val=%d Test_ID=%d Test_OOD_full=%d Test_OOD_filtered=%d",
+        len(train_images), len(val_images), len(test_id_imgs),
+        len(test_ood_imgs), len(test_ood_filtered)
+    )
+
+    # ── Transforms ────────────────────────────────────────────────────────────
+    train_tf = build_train_transform(cfg)
+    eval_tf  = build_eval_transform(cfg)
+
+    # ── Datasets and loaders ──────────────────────────────────────────────────
+    train_ds = D2Dataset(train_images, data_root, train_tf, label_to_idx)
+    val_ds   = D2Dataset(val_images,   data_root, eval_tf,  label_to_idx)
+    test_id_ds  = D2Dataset(test_id_imgs,     data_root, eval_tf, label_to_idx)
+    test_ood_ds = D2Dataset(test_ood_imgs,    data_root, eval_tf, label_to_idx)
+    test_ood_filt_ds = D2Dataset(test_ood_filtered, data_root, eval_tf, label_to_idx)
+
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True,
+        num_workers=num_workers, pin_memory=pin_memory,
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=pin_memory,
+    )
+    test_id_loader = DataLoader(
+        test_id_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=pin_memory,
+    )
+    test_ood_loader = DataLoader(
+        test_ood_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=pin_memory,
+    )
+    test_ood_filt_loader = DataLoader(
+        test_ood_filt_ds, batch_size=batch_size, shuffle=False,
+        num_workers=num_workers, pin_memory=pin_memory,
+    )
+
+    # ── Class weights for weighted cross-entropy loss [ENG] ───────────────────
+    # RATIONALE [ENG]: Weighted CE chosen over WeightedRandomSampler -- see classifier.py
+    # ~35.4x imbalance in D2_Train [DATA]
+    class_counts = Counter(label_to_idx[img["class"]] for img in train_images)
+    class_weights = compute_class_weights(dict(class_counts), num_classes).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    logger.info(
+        "Class weights: min=%.3f max=%.3f (inverse-frequency weighting [ENG])",
+        class_weights.min().item(), class_weights.max().item()
+    )
+
+    # ── Model ─────────────────────────────────────────────────────────────────
+    model_cfg = cfg.get("model", {})
+    model = EfficientNetB3Classifier(
+        num_classes=num_classes,
+        drop_rate=float(model_cfg.get("drop_rate", 0.3)),
+        temperature=float(cfg.get("calibration", {}).get("temperature_init", 1.5)),
+        pretrained=bool(model_cfg.get("pretrained", True)),
+    ).to(device)
+
+    if args.resume:
+        logger.info("Resuming from %s", args.resume)
+        state = torch.load(args.resume, map_location=device, weights_only=True)
+        model.load_state_dict(state)
+
+    # ── Optimiser + scheduler ─────────────────────────────────────────────────
+    # Train all params; using AdamW [ENG]
+    optimiser = optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+
+    # Linear warmup for warmup_ep epochs, then cosine decay [ENG]
+    def _lr_lambda(epoch: int) -> float:
+        if epoch < warmup_ep:
+            return (epoch + 1) / max(warmup_ep, 1)
+        progress = (epoch - warmup_ep) / max(epochs - warmup_ep, 1)
+        return 0.5 * (1.0 + np.cos(np.pi * progress))
+
+    scheduler = optim.lr_scheduler.LambdaLR(optimiser, lr_lambda=_lr_lambda)
+
+    # ── Training loop ─────────────────────────────────────────────────────────
+    best_val_f1     = -1.0
+    no_improve_cnt  = 0
+    best_epoch      = -1
+    train_history   = []
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        epoch_loss = 0.0
+        n_batches  = 0
+        t0 = time.time()
+
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            inputs, targets = inputs.to(device), targets.to(device)
+            optimiser.zero_grad()
+            # Training: raw logits (no temperature scaling in loss) [ENG]
+            logits = model(inputs, calibrate=False)
+            loss   = criterion(logits, targets)
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)  # [ENG]
+            optimiser.step()
+            epoch_loss += loss.item()
+            n_batches  += 1
+
+            if (batch_idx + 1) % 100 == 0:
+                logger.info(
+                    "Epoch %d/%d  batch %d/%d  loss=%.4f  lr=%.2e",
+                    epoch, epochs, batch_idx + 1, len(train_loader),
+                    loss.item(), scheduler.get_last_lr()[0]
+                )
+
+        scheduler.step()
+        avg_loss = epoch_loss / max(n_batches, 1)
+        elapsed  = time.time() - t0
+
+        # ── Validation ────────────────────────────────────────────────────────
+        from sklearn.metrics import f1_score as _f1
+        model.eval()
+        val_preds, val_targets = [], []
+        with torch.no_grad():
+            for inputs, targets in val_loader:
+                inputs = inputs.to(device)
+                logits = model(inputs, calibrate=True)
+                probs  = torch.softmax(logits, dim=1)
+                preds  = probs.argmax(dim=1)
+                val_preds.extend(preds.cpu().numpy())
+                val_targets.extend(targets.cpu().numpy())
+        val_f1 = float(_f1(
+            np.array(val_targets), np.array(val_preds),
+            average="macro", zero_division=0, labels=list(range(num_classes))
+        ))
+
+        logger.info(
+            "Epoch %d/%d  avg_loss=%.4f  val_macro_F1=%.4f  time=%.1fs",
+            epoch, epochs, avg_loss, val_f1, elapsed
+        )
+        train_history.append({"epoch": epoch, "loss": avg_loss, "val_macro_f1": val_f1})
+
+        # ── Early stopping + best model save ─────────────────────────────────
+        if val_f1 > best_val_f1:
+            best_val_f1    = val_f1
+            best_epoch     = epoch
+            no_improve_cnt = 0
+            torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
+            logger.info("Best model saved (epoch=%d val_macro_F1=%.4f)", epoch, best_val_f1)
+        else:
+            no_improve_cnt += 1
+            if no_improve_cnt >= patience:
+                logger.info(
+                    "Early stopping at epoch %d (no improvement for %d epochs [ENG])",
+                    epoch, patience
+                )
+                break
+
+    # Save final model
+    torch.save(model.state_dict(), ckpt_dir / "model.pth")
+    logger.info("Final model saved to %s/model.pth", ckpt_dir)
+
+    # Load best model for evaluation
+    best_path = ckpt_dir / "model_best.pth"
+    if best_path.exists():
+        state = torch.load(best_path, map_location=device, weights_only=True)
+        model.load_state_dict(state)
+        logger.info("Loaded best checkpoint from epoch %d for evaluation", best_epoch)
+
+    # ── Temperature calibration on D2_Val ─────────────────────────────────────
+    temperature = float(cfg.get("calibration", {}).get("temperature_init", 1.5))
+    if not args.no_calibrate:
+        cal_cfg  = cfg.get("calibration", {})
+        temperature = calibrate_temperature(
+            model, val_loader, device,
+            temperature_init=float(cal_cfg.get("temperature_init", 1.5)),
+            max_iter=int(cal_cfg.get("max_iter", 50)),
+        )
+        ece_target = float(cal_cfg.get("ece_target", 0.05))
+        logger.info(
+            "Temperature T=%.4f [ENG assumption target ECE<%.2f -- not literature-derived I24]",
+            temperature, ece_target
+        )
+
+    # Save temperature.json
+    with open(ckpt_dir / "temperature.json", "w") as f:
+        json.dump({"temperature": temperature, "tag": "[ENG assumption -- calibrate on D2_Val]"}, f, indent=2)
+
+    # Save class_map.json and config.json into checkpoint dir
+    with open(ckpt_dir / "class_map.json", "w") as f:
+        json.dump({str(k): v for k, v in idx_to_label.items()}, f, indent=2)
+
+    model_version = paths_cfg.get("model_version", "efficientnet_b3_v1")
+    with open(ckpt_dir / "config.json", "w") as f:
+        json.dump({
+            "model_version": model_version,
+            "num_classes": num_classes,
+            "input_size": model_cfg.get("input_size", 224),
+            "best_epoch": best_epoch,
+            "best_val_macro_f1": best_val_f1,
+            "tag": "[NOT MEASURED until GPU training completes]",
+        }, f, indent=2)
+
+    # ── Full evaluation (all splits) ──────────────────────────────────────────
+    logger.info("--- Evaluation on all splits ---")
+    results = {}
+
+    results["val"]          = evaluate_split(model, val_loader,      device, idx_to_label, "D2_Val")
+    results["test_id"]      = evaluate_split(model, test_id_loader,  device, idx_to_label, "D2_Test_ID")
+    # [D16] Primary OOD: full deduped set
+    results["test_ood_full"] = evaluate_split(model, test_ood_loader, device, idx_to_label, "D2_Test_OOD_full")
+    # Secondary OOD: exclusion-filtered
+    results["test_ood_filt"] = evaluate_split(model, test_ood_filt_loader, device, idx_to_label, "D2_Test_OOD_filtered")
+
+    # OOD gap [ENG spec 2a-vii]
+    id_f1  = results["test_id"]["macro_f1"]
+    ood_f1 = results["test_ood_full"]["macro_f1"]
+    ood_gap = (id_f1 - ood_f1) / max(id_f1, 1e-6)
+    logger.info(
+        "OOD gap [D16]: (Test_ID_F1 - Test_OOD_F1) / Test_ID_F1 = (%.4f - %.4f) / %.4f = %.4f",
+        id_f1, ood_f1, id_f1, ood_gap
+    )
+    logger.info(
+        "CAVEAT: OOD filtered set covers only ~7 of 30 classes -- per-class OOD metrics unreliable [I12/D16]"
+    )
+
+    # ── Print summary ─────────────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("LEAFMIND C2 TRAINING SUMMARY")
+    print("=" * 60)
+    for split, r in results.items():
+        print(
+            f"{r['split']:30s}  n={r['n_images']:5d}  "
+            f"top1={r['top1_accuracy']:.4f}  macro_F1={r['macro_f1']:.4f}  "
+            f"ECE={r['ece']:.4f}"
+        )
+    print(f"OOD gap (primary):  {ood_gap:.4f}")
+    print(f"Temperature T:      {temperature:.4f}")
+    print(f"Best epoch:         {best_epoch}")
+    print("\nQuality gate checks [ENG assumption thresholds]:")
+    print(f"  Test_ID macro_F1 >= 0.75: {'PASS' if id_f1 >= 0.75 else 'FAIL/NOT MET'} ({id_f1:.4f})")
+    print(f"  Test_OOD macro_F1 >= 0.50: {'PASS' if ood_f1 >= 0.50 else 'FAIL/NOT MET'} ({ood_f1:.4f})")
+    print(f"  Val ECE <= 0.05: {'PASS' if results['val']['ece'] <= 0.05 else 'FAIL/NOT MET'} ({results['val']['ece']:.4f})")
+    print("=" * 60)
+
+    # ── Save metrics JSON ─────────────────────────────────────────────────────
+    metrics_out = {
+        "model_version": model_version,
+        "temperature": temperature,
+        "best_epoch": best_epoch,
+        "splits": {},
+        "ood_gap_primary": ood_gap,
+        "tag": "[ALL NUMBERS COMPUTED from actual data -- R1]",
+        "ood_caveat": "Test_OOD filtered set covers only ~7 of 30 classes [I12/D16]. Primary OOD uses full deduped set.",
+    }
+    # Per-class label map for readability in metrics.json
+    per_class_labels = [idx_to_label[i] for i in range(num_classes)]
+
+    for split, r in results.items():
+        metrics_out["splits"][split] = {
+            "n_images":           r["n_images"],
+            "top1_accuracy":      r["top1_accuracy"],
+            "macro_f1":           r["macro_f1"],
+            "ece":                r["ece"],
+            "per_class_f1":       r["per_class_f1"],
+            "per_class_labels":   per_class_labels,
+            "confusion_matrix":   r["confusion_matrix"],
+        }
+
+    metrics_path = ckpt_dir / "metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump(metrics_out, f, indent=2)
+    logger.info("Metrics saved to %s", metrics_path)
+
+    # Save training history
+    with open(ckpt_dir / "train_history.json", "w") as f:
+        json.dump(train_history, f, indent=2)
+
+
+if __name__ == "__main__":
     main()

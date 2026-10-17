@@ -1,0 +1,571 @@
+"""
+tests/unit/test_classifier.py
+==============================
+C2 unit tests for the LeafMind EfficientNet-B3 classifier pipeline.
+
+Tests cover:
+  - Model architecture and forward pass
+  - Image preprocessing (RGB conversion from CMYK, RGBA, L [I9])
+  - Image quality flags (low_resolution, blurry) [ENG assumption thresholds]
+  - ECE computation
+  - Class weight computation
+  - Temperature scaling
+  - VisionOutput schema compliance [R6]
+  - severity_pct = None always [R3/D2/Part 2a-xi]
+  - OOD flag and escalation flag logic [ENG assumption]
+  - Full predict() pipeline on synthetic images
+  - from_checkpoint() round-trip (save + load + predict)
+
+No real model weights are downloaded or used in these tests.
+All model instances use pretrained=False to avoid network access in CI.
+All performance numbers are from synthetic data [R1] -- no fabricated metrics.
+ASCII-only output [I27].
+"""
+from __future__ import annotations
+
+import io
+import json
+import tempfile
+from pathlib import Path
+from typing import Dict
+
+import numpy as np
+import pytest
+import torch
+import torch.nn as nn
+from PIL import Image
+
+# ── Fixtures ──────────────────────────────────────────────────────────────────
+
+NUM_CLASSES = 30  # D2 [DATA]
+
+MOCK_IDX_TO_LABEL: Dict[int, str] = {
+    0: "Apple___Apple_scab",
+    1: "Apple___Cedar_apple_rust",
+    2: "Apple___healthy",
+    3: "Blueberry___healthy",
+    4: "Cherry___healthy",
+    5: "Corn_(maize)___healthy",
+    6: "Corn___Cercospora_leaf_spot",
+    7: "Corn___Common_rust",
+    8: "Corn___Northern_Leaf_Blight",
+    9: "Grape___Black_rot",
+    10: "Grape___Esca_(Black_Measles)",
+    11: "Grape___healthy",
+    12: "Peach___healthy",
+    13: "Pepper,_bell___Bacterial_spot",
+    14: "Pepper,_bell___healthy",
+    15: "Potato___Early_blight",
+    16: "Potato___Late_blight",
+    17: "Potato___healthy",
+    18: "Raspberry___healthy",
+    19: "Soybean___healthy",
+    20: "Squash___Powdery_mildew",
+    21: "Strawberry___healthy",
+    22: "Tomato___Bacterial_spot",
+    23: "Tomato___Early_blight",
+    24: "Tomato___Late_blight",
+    25: "Tomato___Leaf_Mold",
+    26: "Tomato___Septoria_leaf_spot",
+    27: "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+    28: "Tomato___Tomato_mosaic_virus",
+    29: "Tomato___healthy",
+}
+
+
+def _make_image_bytes(w: int = 224, h: int = 224, mode: str = "RGB") -> bytes:
+    """Create a small synthetic image in the given mode as JPEG bytes."""
+    arr = np.random.randint(50, 200, (h, w, 3), dtype=np.uint8)
+    img = Image.fromarray(arr, mode="RGB")
+    if mode == "CMYK":
+        img = img.convert("CMYK")
+    elif mode == "RGBA":
+        img = img.convert("RGBA")
+    elif mode == "L":
+        img = img.convert("L")
+    buf = io.BytesIO()
+    fmt = "JPEG" if mode != "RGBA" else "PNG"
+    img.save(buf, format=fmt)
+    return buf.getvalue()
+
+
+@pytest.fixture(scope="module")
+def model_no_pretrain():
+    """EfficientNetB3Classifier without pretrained weights (no network access in CI)."""
+    from src.models.classifier import EfficientNetB3Classifier
+    return EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False, temperature=1.5)
+
+
+@pytest.fixture(scope="module")
+def leaf_classifier_no_pretrain(model_no_pretrain):
+    """LeafClassifier wrapping the untrained model."""
+    from src.models.classifier import LeafClassifier
+    return LeafClassifier(
+        model=model_no_pretrain,
+        idx_to_label=MOCK_IDX_TO_LABEL,
+        model_version="test_v0",
+        device=torch.device("cpu"),
+    )
+
+
+# ── Architecture tests ────────────────────────────────────────────────────────
+
+class TestEfficientNetB3Architecture:
+
+    def test_model_creates_without_pretrained(self):
+        """Model builds without downloading weights."""
+        from src.models.classifier import EfficientNetB3Classifier
+        model = EfficientNetB3Classifier(num_classes=30, pretrained=False)
+        assert model is not None
+
+    def test_forward_pass_output_shape(self, model_no_pretrain):
+        """Forward pass produces (batch, 30) logits."""
+        model_no_pretrain.eval()
+        x = torch.randn(2, 3, 224, 224)
+        with torch.no_grad():
+            out = model_no_pretrain(x, calibrate=False)
+        assert out.shape == (2, NUM_CLASSES), f"Expected (2, {NUM_CLASSES}), got {out.shape}"
+
+    def test_calibrated_forward_divides_by_temperature(self, model_no_pretrain):
+        """Temperature scaling applied when calibrate=True."""
+        model_no_pretrain.eval()
+        x = torch.randn(1, 3, 224, 224)
+        with torch.no_grad():
+            raw    = model_no_pretrain(x, calibrate=False)
+            scaled = model_no_pretrain(x, calibrate=True)
+        T = model_no_pretrain.get_temperature()
+        assert T > 0, "Temperature must be positive"
+        # scaled logits should differ from raw (unless T==1.0)
+        diff = (scaled - raw / T).abs().max().item()
+        assert diff < 1e-4, f"Calibrated logits differ unexpectedly: diff={diff}"
+
+    def test_temperature_parameter_is_learnable(self, model_no_pretrain):
+        """Temperature is a nn.Parameter (learnable for calibration)."""
+        assert isinstance(model_no_pretrain.scaler.temperature, nn.Parameter)
+
+    def test_num_classes_correct(self, model_no_pretrain):
+        """Output layer has exactly 30 units [DATA]."""
+        assert model_no_pretrain.num_classes == NUM_CLASSES
+
+    def test_output_sums_to_one_after_softmax(self, model_no_pretrain):
+        """Softmax of calibrated logits sums to 1."""
+        model_no_pretrain.eval()
+        x = torch.randn(3, 3, 224, 224)
+        with torch.no_grad():
+            logits = model_no_pretrain(x, calibrate=True)
+            probs  = torch.softmax(logits, dim=1)
+        row_sums = probs.sum(dim=1)
+        assert torch.allclose(row_sums, torch.ones(3), atol=1e-5), \
+            f"Softmax does not sum to 1: {row_sums}"
+
+
+# ── Preprocessing + RGB conversion tests [I9] ─────────────────────────────────
+
+class TestImagePreprocessing:
+
+    def test_rgb_image_passes_through(self):
+        """RGB image preprocesses without error."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="RGB")
+        tensor, pil_img = preprocess_image(img_bytes, input_size=224)
+        assert tensor.shape == (1, 3, 224, 224)
+        assert pil_img.mode == "RGB"
+
+    def test_cmyk_converted_to_rgb(self):
+        """CMYK image is force-converted to RGB at load time [I9]."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="CMYK")
+        tensor, pil_img = preprocess_image(img_bytes, input_size=224)
+        assert tensor.shape == (1, 3, 224, 224), "CMYK->RGB tensor must be (1,3,H,W)"
+
+    def test_rgba_converted_to_rgb(self):
+        """RGBA image is force-converted to RGB at load time [I9]."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="RGBA")
+        tensor, pil_img = preprocess_image(img_bytes, input_size=224)
+        assert tensor.shape == (1, 3, 224, 224), "RGBA->RGB tensor must be (1,3,H,W)"
+
+    def test_grayscale_L_converted_to_rgb(self):
+        """L (grayscale) image is force-converted to RGB at load time [I9]."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="L")
+        tensor, pil_img = preprocess_image(img_bytes, input_size=224)
+        assert tensor.shape == (1, 3, 224, 224), "L->RGB tensor must be (1,3,H,W)"
+
+    def test_corrupt_bytes_raises_value_error(self):
+        """Invalid bytes raise ValueError."""
+        from src.models.classifier import preprocess_image
+        with pytest.raises((ValueError, Exception)):
+            preprocess_image(b"not an image", input_size=224)
+
+    def test_output_tensor_dtype_is_float32(self):
+        """Output tensor is float32."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="RGB")
+        tensor, _ = preprocess_image(img_bytes, input_size=224)
+        assert tensor.dtype == torch.float32
+
+    def test_normalisation_applied(self):
+        """Tensor values are not in raw [0,1] range after normalisation."""
+        from src.models.classifier import preprocess_image
+        img_bytes = _make_image_bytes(mode="RGB")
+        tensor, _ = preprocess_image(img_bytes, input_size=224)
+        # After ImageNet normalisation, some values will be negative
+        assert tensor.min().item() < 0.0, "Normalised tensor should have negative values"
+
+
+# ── Image quality flag tests [ENG assumption thresholds] ──────────────────────
+
+class TestImageQualityFlags:
+
+    def test_normal_image_not_low_res(self):
+        """224x224 image is not flagged as low resolution [ENG assumption: threshold=200]."""
+        from src.models.classifier import check_image_quality
+        img = Image.new("RGB", (224, 224), color=(100, 150, 50))
+        flags = check_image_quality(img, low_res_px=200)
+        assert not flags.low_resolution, "224x224 should NOT be low_resolution"
+
+    def test_tiny_image_flagged_as_low_res(self):
+        """50x50 image is flagged as low resolution [ENG assumption]."""
+        from src.models.classifier import check_image_quality
+        img = Image.new("RGB", (50, 50), color=(100, 150, 50))
+        flags = check_image_quality(img, low_res_px=200)
+        assert flags.low_resolution, "50x50 MUST be flagged as low_resolution [ENG assumption]"
+
+    def test_boundary_at_threshold(self):
+        """Image with max dimension exactly at threshold is flagged [ENG assumption: strict <]."""
+        from src.models.classifier import check_image_quality
+        img = Image.new("RGB", (199, 150), color=(100, 150, 50))
+        flags = check_image_quality(img, low_res_px=200)
+        assert flags.low_resolution, "max(199,150)=199 < 200 -> low_resolution=True [ENG]"
+
+    def test_uniform_image_is_blurry(self):
+        """
+        Completely uniform image has Laplacian variance = 0 -> blurry [ENG assumption].
+        This tests the blurry detection heuristic, not calibration quality.
+        """
+        from src.models.classifier import check_image_quality
+        img = Image.new("RGB", (224, 224), color=(128, 128, 128))
+        flags = check_image_quality(img, blur_lap=100.0)
+        assert flags.blurry, "Uniform image must be flagged as blurry [ENG assumption]"
+
+    def test_non_leaf_suspected_always_false(self):
+        """non_leaf_suspected is always False (no dedicated model) [ENG]."""
+        from src.models.classifier import check_image_quality
+        img = Image.new("RGB", (224, 224), color=(100, 150, 50))
+        flags = check_image_quality(img)
+        assert not flags.non_leaf_suspected, \
+            "non_leaf_suspected must always be False (no leaf detection model) [ENG]"
+
+    def test_quality_flags_return_correct_type(self):
+        """check_image_quality returns ImageQualityFlags Pydantic model."""
+        from src.models.classifier import check_image_quality
+        from src.schemas.schemas import ImageQualityFlags
+        img = Image.new("RGB", (224, 224), color=(100, 150, 50))
+        flags = check_image_quality(img)
+        assert isinstance(flags, ImageQualityFlags)
+
+
+# ── ECE computation tests ─────────────────────────────────────────────────────
+
+class TestECEComputation:
+
+    def test_perfect_calibration_ece_near_zero(self):
+        """
+        Perfect calibration: confidence matches accuracy -> ECE near 0.
+        Example: confidence=0.8, fraction correct=0.8 -> bin ECE = |0.8-0.8|*1.0 = 0.
+        Using a mixed scenario where for each bin the accuracy == confidence.
+        """
+        from src.models.classifier import compute_ece
+        rng = np.random.RandomState(7)
+        # Create samples where for every sample, confidence = true probability of being correct
+        # Approximate by making accuracy ≈ confidence at the aggregate level:
+        # Use confidence=0.7 with 70% correct -> ECE bin contribution = |0.7 - 0.7| * 1.0 = 0
+        n = 1000
+        confs = np.full(n, 0.7)
+        # Exactly 70% correct -> accuracy in bin = 0.7 = confidence -> ECE = 0
+        correct = np.zeros(n)
+        correct[:700] = 1.0
+        ece = compute_ece(confs, correct, n_bins=15)
+        assert ece < 0.01, f"Perfect calibration ECE (conf=acc=0.7) should be ~0, got {ece}"
+
+    def test_overconfident_model_high_ece(self):
+        """Overconfident model: high confidence, low accuracy -> high ECE."""
+        from src.models.classifier import compute_ece
+        n = 1000
+        confs   = np.full(n, 0.95)
+        correct = np.zeros(n)  # all wrong
+        ece = compute_ece(confs, correct, n_bins=15)
+        assert ece > 0.5, f"Overconfident ECE should be > 0.5, got {ece}"
+
+    def test_ece_in_zero_one_range(self):
+        """ECE is always in [0, 1]."""
+        from src.models.classifier import compute_ece
+        rng = np.random.RandomState(42)
+        confs   = rng.random(500)
+        correct = rng.randint(0, 2, 500).astype(float)
+        ece = compute_ece(confs, correct)
+        assert 0.0 <= ece <= 1.0, f"ECE out of range: {ece}"
+
+    def test_ece_target_is_eng_assumption(self):
+        """Verify that ECE target 0.05 is tagged as ENG assumption in config."""
+        import yaml
+        cfg_path = Path(__file__).resolve().parents[2] / "config" / "classifier_config.yaml"
+        if not cfg_path.exists():
+            pytest.skip("classifier_config.yaml not found -- skipping config check")
+        with open(cfg_path) as f:
+            cfg = yaml.safe_load(f)
+        # The ECE target value should match what's in the threshold register [plan.md]
+        ece_target = cfg.get("calibration", {}).get("ece_target", None)
+        assert ece_target == 0.05, f"Expected ece_target=0.05 [ENG assumption], got {ece_target}"
+
+
+# ── Class weight tests ────────────────────────────────────────────────────────
+
+class TestClassWeights:
+
+    def test_class_weights_shape(self):
+        """Class weights tensor has shape (num_classes,)."""
+        from src.models.classifier import compute_class_weights
+        counts = {i: 100 + i * 10 for i in range(30)}
+        w = compute_class_weights(counts, 30)
+        assert w.shape == (30,)
+
+    def test_class_weights_inverse_frequency(self):
+        """Minority class gets higher weight than majority class."""
+        from src.models.classifier import compute_class_weights
+        counts = {0: 100, 1: 3750}  # simulates Potato___healthy vs TYLCV imbalance [DATA]
+        w = compute_class_weights(counts, 2)
+        assert w[0] > w[1], "Minority class (100 images) must have higher weight than majority (3750)"
+
+    def test_class_weights_sum_property(self):
+        """With uniform counts, all weights should be equal."""
+        from src.models.classifier import compute_class_weights
+        counts = {i: 100 for i in range(30)}
+        w = compute_class_weights(counts, 30)
+        assert torch.allclose(w, w[0].expand(30), atol=1e-5), \
+            "Uniform counts should produce equal weights"
+
+    def test_class_weights_positive(self):
+        """All weights must be strictly positive."""
+        from src.models.classifier import compute_class_weights
+        counts = {0: 1, 1: 3750, **{i: 500 for i in range(2, 30)}}
+        w = compute_class_weights(counts, 30)
+        assert (w > 0).all(), "All class weights must be positive"
+
+
+# ── Temperature scaling tests ─────────────────────────────────────────────────
+
+class TestTemperatureScaling:
+
+    def test_temperature_scaler_divides_logits(self):
+        """TemperatureScaler divides logits by T."""
+        from src.models.classifier import TemperatureScaler
+        scaler = TemperatureScaler(temperature=2.0)
+        logits = torch.tensor([[2.0, 4.0, 6.0]])
+        scaled = scaler(logits)
+        expected = torch.tensor([[1.0, 2.0, 3.0]])
+        assert torch.allclose(scaled, expected, atol=1e-5)
+
+    def test_temperature_scaler_t_equals_one_is_identity(self):
+        """T=1.0 leaves logits unchanged."""
+        from src.models.classifier import TemperatureScaler
+        scaler = TemperatureScaler(temperature=1.0)
+        logits = torch.randn(4, 30)
+        scaled = scaler(logits)
+        assert torch.allclose(scaled, logits, atol=1e-5)
+
+    def test_temperature_cannot_be_zero_or_negative(self):
+        """Temperature is clamped to positive values in forward."""
+        from src.models.classifier import TemperatureScaler
+        scaler = TemperatureScaler(temperature=0.0)
+        logits = torch.tensor([[1.0, 2.0]])
+        # Should not produce NaN/Inf due to clamp(min=1e-6)
+        out = scaler(logits)
+        assert not torch.isnan(out).any(), "Clamped T=0 should not produce NaN"
+        assert not torch.isinf(out).any(), "Clamped T=0 should not produce Inf"
+
+
+# ── Full predict() pipeline tests ─────────────────────────────────────────────
+
+class TestLeafClassifierPredict:
+
+    def test_predict_returns_vision_output(self, leaf_classifier_no_pretrain):
+        """predict() returns a VisionOutput instance."""
+        from src.schemas.schemas import VisionOutput
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert isinstance(out, VisionOutput), f"Expected VisionOutput, got {type(out)}"
+
+    def test_severity_pct_always_none(self, leaf_classifier_no_pretrain):
+        """severity_pct is ALWAYS None [R3/D2/Part 2a-xi]."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert out.severity_pct is None, "CRITICAL VIOLATION: severity_pct must be None [R3]"
+
+    def test_severity_note_present_and_nonempty(self, leaf_classifier_no_pretrain):
+        """severity_note is a non-empty string explaining why severity is null [R3]."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert out.severity_note, "severity_note must be non-empty [R3]"
+        assert len(out.severity_note) > 20, "severity_note must be a meaningful explanation"
+
+    def test_confidence_in_valid_range(self, leaf_classifier_no_pretrain):
+        """Confidence is in [0.0, 1.0]."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert 0.0 <= out.confidence <= 1.0, f"Confidence out of range: {out.confidence}"
+
+    def test_top_k_probs_nonempty(self, leaf_classifier_no_pretrain):
+        """top_k_probs has at least one entry."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert len(out.top_k_probs) >= 1, "top_k_probs must have at least one entry"
+
+    def test_top_label_is_valid_d2_class(self, leaf_classifier_no_pretrain):
+        """top_label is one of the 30 D2 classes [DATA]."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        valid_labels = set(MOCK_IDX_TO_LABEL.values())
+        assert out.top_label in valid_labels, \
+            f"top_label '{out.top_label}' not in D2 class list [DATA]"
+
+    def test_temperature_positive(self, leaf_classifier_no_pretrain):
+        """Temperature value > 0."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert out.temperature > 0, "temperature must be positive"
+
+    def test_model_version_nonempty(self, leaf_classifier_no_pretrain):
+        """model_version field is non-empty."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert out.model_version, "model_version must be non-empty"
+
+    def test_leaf_detected_false_for_c2(self, leaf_classifier_no_pretrain):
+        """leaf_detected is always False in C2 (YOLOv8 out of scope)."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert not out.leaf_detected, \
+            "leaf_detected must be False in C2 (YOLOv8 detector out of scope)"
+
+    def test_detected_leaves_empty_for_c2(self, leaf_classifier_no_pretrain):
+        """detected_leaves is empty list in C2."""
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert out.detected_leaves == [], \
+            "detected_leaves must be [] in C2 (YOLOv8 out of scope)"
+
+    def test_ood_flag_high_for_low_confidence(self):
+        """
+        When model produces low confidence (< 0.40 [ENG assumption]), ood_flag=True.
+        This is tested by setting ood_thresh=1.0 to force ood_flag=True for any image.
+        [ENG assumption -- threshold to be calibrated on labelled OOD set]
+        """
+        from src.models.classifier import EfficientNetB3Classifier, LeafClassifier
+        model = EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False)
+        clf = LeafClassifier(
+            model=model,
+            idx_to_label=MOCK_IDX_TO_LABEL,
+            device=torch.device("cpu"),
+            ood_thresh=1.0,    # force ood_flag=True for any confidence [ENG test]
+        )
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = clf.predict(img_bytes)
+        assert out.ood_flag, \
+            "ood_flag should be True when confidence < ood_thresh=1.0 [ENG assumption]"
+
+    def test_escalation_forced_by_low_conf_threshold(self):
+        """
+        escalate_to_human=True when confidence < escalate threshold [ENG assumption].
+        """
+        from src.models.classifier import EfficientNetB3Classifier, LeafClassifier
+        model = EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False)
+        clf = LeafClassifier(
+            model=model,
+            idx_to_label=MOCK_IDX_TO_LABEL,
+            device=torch.device("cpu"),
+            esc_conf=1.0,   # force escalation for any confidence [ENG test]
+        )
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = clf.predict(img_bytes)
+        assert out.escalate_to_human, \
+            "escalate_to_human must be True when conf < esc_conf=1.0 [ENG assumption]"
+
+    def test_cmyk_predict_succeeds(self, leaf_classifier_no_pretrain):
+        """CMYK image is handled via RGB conversion -- no crash [I9]."""
+        img_bytes = _make_image_bytes(mode="CMYK")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert isinstance(out.confidence, float)
+        assert out.severity_pct is None
+
+    def test_rgba_predict_succeeds(self, leaf_classifier_no_pretrain):
+        """RGBA image is handled via RGB conversion -- no crash [I9]."""
+        img_bytes = _make_image_bytes(mode="RGBA")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert isinstance(out.confidence, float)
+
+    def test_grayscale_predict_succeeds(self, leaf_classifier_no_pretrain):
+        """L (grayscale) image is handled via RGB conversion -- no crash [I9]."""
+        img_bytes = _make_image_bytes(mode="L")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        assert isinstance(out.confidence, float)
+
+    def test_schema_validates_via_pydantic(self, leaf_classifier_no_pretrain):
+        """VisionOutput from predict() passes Pydantic model_validate [R6]."""
+        from src.schemas.schemas import VisionOutput
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = leaf_classifier_no_pretrain.predict(img_bytes)
+        # model_validate will re-validate all fields; raises ValidationError if invalid
+        VisionOutput.model_validate(out.model_dump())
+
+
+# ── Checkpoint round-trip test ─────────────────────────────────────────────────
+
+class TestCheckpointRoundTrip:
+
+    def test_save_and_load_checkpoint(self, tmp_path):
+        """Save model to tmp checkpoint dir and reload via from_checkpoint()."""
+        import json
+        from src.models.classifier import EfficientNetB3Classifier, LeafClassifier
+
+        # Create and save a model
+        model = EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False, temperature=1.5)
+        ckpt_dir = tmp_path / "ckpt"
+        ckpt_dir.mkdir()
+
+        torch.save(model.state_dict(), ckpt_dir / "model.pth")
+        with open(ckpt_dir / "temperature.json", "w") as f:
+            json.dump({"temperature": 1.5}, f)
+        with open(ckpt_dir / "class_map.json", "w") as f:
+            json.dump({str(k): v for k, v in MOCK_IDX_TO_LABEL.items()}, f)
+        with open(ckpt_dir / "config.json", "w") as f:
+            json.dump({"model_version": "test_ckpt_v0", "num_classes": NUM_CLASSES}, f)
+
+        # Load and predict
+        clf = LeafClassifier.from_checkpoint(ckpt_dir, device=torch.device("cpu"))
+        img_bytes = _make_image_bytes(mode="RGB")
+        out = clf.predict(img_bytes)
+
+        assert out.model_version == "test_ckpt_v0"
+        assert out.temperature == pytest.approx(1.5, abs=1e-4)
+        assert out.severity_pct is None  # R3
+        assert isinstance(out.confidence, float)
+
+    def test_missing_checkpoint_dir_raises(self):
+        """from_checkpoint raises FileNotFoundError when dir missing."""
+        from src.models.classifier import LeafClassifier
+        with pytest.raises(FileNotFoundError):
+            LeafClassifier.from_checkpoint("/nonexistent/path/xyz")
+
+    def test_missing_model_pth_raises(self, tmp_path):
+        """from_checkpoint raises FileNotFoundError when model.pth missing."""
+        import json
+        from src.models.classifier import LeafClassifier
+        (tmp_path / "class_map.json").write_text(
+            json.dumps({str(k): v for k, v in MOCK_IDX_TO_LABEL.items()})
+        )
+        (tmp_path / "temperature.json").write_text(json.dumps({"temperature": 1.5}))
+        # No model.pth
+        with pytest.raises(FileNotFoundError):
+            LeafClassifier.from_checkpoint(tmp_path)

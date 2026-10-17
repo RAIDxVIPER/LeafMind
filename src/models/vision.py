@@ -1,31 +1,23 @@
 """
 src/models/vision.py
 ====================
-Vision inference wrapper. Mocks PyTorch EfficientNet-B3 classification for pipeline testing.
+Re-exports from src.models.classifier for backward compatibility.
+The real implementation lives in classifier.py (C2).
+
+This file is kept so that any existing import of src.models.vision
+continues to work.
 """
+# Re-export everything from the real classifier module
+from src.models.classifier import (  # noqa: F401
+    EfficientNetB3Classifier,
+    LeafClassifier,
+    TemperatureScaler,
+    compute_class_weights,
+    compute_ece,
+    preprocess_image,
+    check_image_quality,
+    SEVERITY_NOTE,
+)
 
-from pathlib import Path
-from src.schemas.schemas import VisionOutput
-
-class VisionAgent:
-    def __init__(self, model_path: str = None):
-        """
-        [STUB] Initializes the EfficientNet-B3 vision model with temperature scaling.
-        Currently mocked to prevent heavy PyTorch loads during pipeline testing.
-        """
-        self.model_path = model_path
-        
-    def predict(self, image_path: str) -> VisionOutput:
-        """
-        [MOCK] Simulates running an image through the Vision pipeline.
-        Returns a valid VisionOutput instance.
-        """
-        # As per R3 and Part 2a-xi: severity_pct must always be None.
-        return VisionOutput(
-            detected_disease="Apple___Apple_scab",
-            confidence=0.92,
-            severity_pct=None,
-            severity_note="Severity tracking omitted due to lack of lesion-level annotations (Part 2a-xi).",
-            is_ood=False,
-            temperature_scaled=True
-        )
+# Backward-compat alias: VisionAgent is in src.agents.vision_agent
+from src.agents.vision_agent import VisionAgent  # noqa: F401
