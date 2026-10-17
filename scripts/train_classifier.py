@@ -67,6 +67,44 @@ CLASS_MAP_FILE = REPO_ROOT / "config" / "class_map_d2.json"
 EXCLUSION_FILE = REPO_ROOT / "config" / "exclusion_list.json"
 
 
+def stratified_sample(images: list, max_n: int, rng: random.Random) -> list:
+    """
+    Seeded stratified random sample that guarantees at least 1 image per class
+    where available, up to max_n total images [Bug7].
+    Uses rng.sample internally.
+    """
+    if len(images) <= max_n:
+        return list(images)
+
+    from collections import defaultdict
+    by_class = defaultdict(list)
+    for img in images:
+        by_class[img["class"]].append(img)
+
+    classes = sorted(by_class.keys())
+    for cls in classes:
+        rng.shuffle(by_class[cls])
+
+    sampled = []
+    if max_n >= len(classes):
+        for cls in classes:
+            if by_class[cls]:
+                sampled.append(by_class[cls].pop())
+        remaining_pool = []
+        for cls in classes:
+            remaining_pool.extend(by_class[cls])
+        needed = max_n - len(sampled)
+        if needed > 0 and remaining_pool:
+            sampled.extend(rng.sample(remaining_pool, min(needed, len(remaining_pool))))
+    else:
+        selected_classes = rng.sample(classes, max_n)
+        for cls in selected_classes:
+            sampled.append(by_class[cls].pop())
+
+    rng.shuffle(sampled)
+    return sampled
+
+
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
 class D2Dataset(Dataset):
@@ -164,8 +202,7 @@ def build_train_transform(cfg: dict) -> transforms.Compose:
         ),
         transforms.RandomGrayscale(p=aug.get("grayscale_p", 0.05)),             # [ENG]
         # Bug5: RandomApply evaluates the p-gate per image, not once at build time.
-        # The previous conditional (if random.random() < p: GaussianBlur else Lambda)
-        # was evaluated ONCE when building the transform, so every image in an epoch
+        # Previously evaluated once at build time so every image in an epoch
         # saw the same choice (always blur or never blur).
         transforms.RandomApply(
             [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))],
@@ -504,21 +541,38 @@ def main():
         "Per-class OOD metrics are unreliable [I12]. Primary evaluation uses full deduped OOD set [D16]."
     )
 
-    # Bug7: subset limits use seeded random sample (not first-N slice)
+    # ── Class weights for weighted cross-entropy loss [ENG] ───────────────────
+    # RATIONALE [ENG]: Weighted CE chosen over WeightedRandomSampler -- see classifier.py
+    # ~35.4x imbalance in D2_Train [DATA].
+    # Bug7: ALWAYS computed from the FULL training manifest before any dry-run subsampling.
+    full_train_counts = Counter(label_to_idx[img["class"]] for img in train_images)
+    class_weights = compute_class_weights(dict(full_train_counts), num_classes).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    logger.info(
+        "Class weights: min=%.3f max=%.3f (computed from full train manifest [%d images] [ENG/Bug7])",
+        class_weights.min().item(), class_weights.max().item(), len(train_images)
+    )
+
+    # Bug7: subset limits use seeded STRATIFIED random sample (not first-N slice)
+    # Guarantees at least 1 image per class where available [Bug7].
+    # Uses _rng.sample internally via stratified_sample.
     _rng = random.Random(seed)  # deterministic subset selection
     if args.max_train_images and len(train_images) > args.max_train_images:
-        train_images = _rng.sample(train_images, args.max_train_images)
-        logger.info("DRY-RUN: sampled %d training images (seed=%d)", len(train_images), seed)
+        train_images = stratified_sample(train_images, args.max_train_images, _rng)
+        logger.info(
+            "DRY-RUN: stratified-sampled %d training images via _rng.sample (seed=%d)",
+            len(train_images), seed
+        )
     if args.max_eval_images:
         if len(val_images) > args.max_eval_images:
-            val_images = _rng.sample(val_images, args.max_eval_images)
+            val_images = stratified_sample(val_images, args.max_eval_images, _rng)
         if len(test_id_imgs) > args.max_eval_images:
-            test_id_imgs = _rng.sample(test_id_imgs, args.max_eval_images)
+            test_id_imgs = stratified_sample(test_id_imgs, args.max_eval_images, _rng)
         if len(test_ood_imgs) > args.max_eval_images:
-            test_ood_imgs = _rng.sample(test_ood_imgs, args.max_eval_images)
-        # Re-apply OOD exclusion filter on the sampled set
-        test_ood_filtered = [img for img in test_ood_imgs if img["md5"] not in excl_md5s]
-        logger.info("DRY-RUN: sampled %d eval images per split (seed=%d)", args.max_eval_images, seed)
+            test_ood_imgs = stratified_sample(test_ood_imgs, args.max_eval_images, _rng)
+        if len(test_ood_filtered) > args.max_eval_images:
+            test_ood_filtered = stratified_sample(test_ood_filtered, args.max_eval_images, _rng)
+        logger.info("DRY-RUN: stratified-sampled eval images per split via _rng.sample (seed=%d)", seed)
 
     logger.info(
         "Split sizes: Train=%d Val=%d Test_ID=%d Test_OOD_full=%d Test_OOD_filtered=%d",
@@ -556,17 +610,6 @@ def main():
     test_ood_filt_loader = DataLoader(
         test_ood_filt_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=pin_memory,
-    )
-
-    # ── Class weights for weighted cross-entropy loss [ENG] ───────────────────
-    # RATIONALE [ENG]: Weighted CE chosen over WeightedRandomSampler -- see classifier.py
-    # ~35.4x imbalance in D2_Train [DATA]
-    class_counts = Counter(label_to_idx[img["class"]] for img in train_images)
-    class_weights = compute_class_weights(dict(class_counts), num_classes).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
-    logger.info(
-        "Class weights: min=%.3f max=%.3f (inverse-frequency weighting [ENG])",
-        class_weights.min().item(), class_weights.max().item()
     )
 
     # ── Model ─────────────────────────────────────────────────────────────────

@@ -48,6 +48,7 @@ from src.models.classifier import (
     LeafClassifier,
     compute_class_weights,
     compute_ece,
+    resolve_image_path,
 )
 from src.schemas.schemas import VisionOutput
 
@@ -159,7 +160,7 @@ def make_real_dataset(
     subset = all_images[:max_images]
 
     # Verify at least one file is accessible
-    if not (data_root / subset[0]["path"]).exists():
+    if not resolve_image_path(data_root, subset[0]["path"]).exists():
         return None
 
     return subset

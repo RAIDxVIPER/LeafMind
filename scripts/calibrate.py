@@ -165,7 +165,8 @@ def optimise_temperature(
     T > 1 softens; T < 1 sharpens.
     Returns: optimised temperature (float, always > 0).
     """
-    scaler = TemperatureScaler(temperature=init_temp)
+    scaler = TemperatureScaler(temperature=init_temp).to(logits.device)
+    labels = labels.to(logits.device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.LBFGS(
         [scaler.temperature],

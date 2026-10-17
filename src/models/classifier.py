@@ -63,7 +63,7 @@ _DEFAULT_BLUR_LAP   = 100.0         # Laplacian variance < threshold -> blurry [
 
 # ── Cross-platform path helper [Bug1] ────────────────────────────────────────
 
-def resolve_image_path(data_root: Path, rel: str) -> Path:
+def resolve_image_path(data_root: Path | str, rel: str) -> Path:
     """
     Resolve a manifest-relative image path to an absolute Path.
 
@@ -78,7 +78,7 @@ def resolve_image_path(data_root: Path, rel: str) -> Path:
     Usage:
         img_path = resolve_image_path(data_root, entry["path"])
     """
-    return data_root / rel.replace("\\", "/")
+    return Path(data_root) / rel.replace("\\", "/")
 
 
 # ── Quality gate helpers ──────────────────────────────────────────────────────

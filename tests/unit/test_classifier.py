@@ -967,6 +967,39 @@ class TestBug7MaxTrainImagesRandomSample:
             "train_classifier.main must NOT use first-N slice for --max-train-images [Bug7]"
         )
 
+    def test_stratified_sample_covers_all_classes(self):
+        """stratified_sample guarantees at least 1 image per class where available [Bug7]."""
+        import random as stdlib_random
+        from scripts.train_classifier import stratified_sample
+
+        # 10 classes, varying sizes (imbalanced)
+        manifest = []
+        for c in range(10):
+            count = (c + 1) * 20
+            for i in range(count):
+                manifest.append({"path": f"img_{c}_{i}.jpg", "class": f"cls_{c}", "md5": f"{c}_{i}"})
+
+        rng = stdlib_random.Random(42)
+        sample_size = 25
+        sampled = stratified_sample(manifest, sample_size, rng)
+
+        assert len(sampled) == sample_size
+        represented_classes = set(item["class"] for item in sampled)
+        assert len(represented_classes) == 10, (
+            "All 10 classes must be represented in stratified sample of size 25 [Bug7]. "
+            "Got: {}".format(represented_classes)
+        )
+
+    def test_stratified_sample_deterministic(self):
+        """stratified_sample produces identical samples with same seed [Bug7]."""
+        import random as stdlib_random
+        from scripts.train_classifier import stratified_sample
+
+        manifest = [{"path": f"img_{i}.jpg", "class": f"cls_{i % 5}", "md5": str(i)} for i in range(200)]
+        s1 = stratified_sample(manifest, 30, stdlib_random.Random(123))
+        s2 = stratified_sample(manifest, 30, stdlib_random.Random(123))
+        assert s1 == s2
+
 
 class TestBug8ECECaveat:
     """Bug8: OOD ECE reporting must include a caveat that T was fitted on D2_Val."""
