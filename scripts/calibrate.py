@@ -1,4 +1,4 @@
-﻿"""
+"""
 scripts/calibrate.py
 =====================
 Post-training temperature scaling calibration for the LeafMind classifier.
@@ -59,6 +59,7 @@ from src.models.classifier import (
     EfficientNetB3Classifier,
     TemperatureScaler,
     compute_ece,
+    resolve_image_path,   # Bug1: cross-platform backslash fix
 )
 
 # ASCII-only logging [I27]
@@ -110,7 +111,8 @@ class D2ValDataset(Dataset):
 
     def __getitem__(self, idx: int):
         entry = self.entries[idx]
-        img_path = self.data_root / entry["path"]
+        # Bug1: resolve_image_path converts Windows backslashes for Linux/Mac compat
+        img_path = resolve_image_path(self.data_root, entry["path"])
         try:
             img = Image.open(img_path)
             if img.mode != "RGB":
@@ -120,7 +122,8 @@ class D2ValDataset(Dataset):
             logger.warning("Cannot load %s: %s -- using blank image", img_path, exc)
             img = Image.new("RGB", (self.input_size, self.input_size), color=(128, 128, 128))
         tensor = self.transform(img)
-        label_idx = self.label_to_idx.get(entry["label"], 0)
+        # Bug2: key is 'class', not 'label' -- manifests use 'class' [DATA]
+        label_idx = self.label_to_idx.get(entry["class"], 0)
         return tensor, label_idx
 
 
@@ -258,12 +261,20 @@ def run_calibration(
         pin_memory=(device.type == "cuda"),
     )
 
-    # Load model
-    model_path = checkpoint_dir / "model.pth"
+    # Load model -- prefer model_best.pth if present (Bug4)
+    best_path = checkpoint_dir / "model_best.pth"
+    model_path = best_path if best_path.exists() else checkpoint_dir / "model.pth"
     if not model_path.exists():
         raise FileNotFoundError(
             "model.pth not found in {}.\n"
             "Run full GPU training first (scripts/train_classifier.py).".format(checkpoint_dir)
+        )
+    if best_path.exists():
+        logger.info("Loading best checkpoint: %s [Bug4]", model_path)
+    else:
+        logger.warning(
+            "model_best.pth not found; falling back to model.pth. "
+            "Calibration may be sub-optimal if final epoch was not the best."
         )
     model = EfficientNetB3Classifier(num_classes=num_classes, pretrained=False).to(device)
     state = torch.load(model_path, map_location=device, weights_only=True)
@@ -313,6 +324,12 @@ def run_calibration(
             "tag": "[ENG] temperature scaling, Guo et al. 2017 method",
         }, f, indent=2)
     logger.info("Written: %s  (T=%.4f)", temp_out, opt_temp)
+
+    # Bug4: update model.scaler.temperature and re-save model.pth so state dict
+    # is consistent with temperature.json (both are authoritative together).
+    model.scaler.temperature.data.fill_(opt_temp)
+    torch.save(model.state_dict(), checkpoint_dir / "model.pth")
+    logger.info("model.pth re-saved with calibrated T=%.4f in state dict [Bug4]", opt_temp)
 
     metrics = {
         "pre_calibration": {

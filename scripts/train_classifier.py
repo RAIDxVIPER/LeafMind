@@ -50,6 +50,7 @@ from src.models.classifier import (
     EfficientNetB3Classifier,
     compute_class_weights,
     compute_ece,
+    resolve_image_path,   # Bug1: cross-platform backslash fix
 )
 
 # ── ASCII-only logging [I27] ─────────────────────────────────────────────────
@@ -94,7 +95,8 @@ class D2Dataset(Dataset):
 
     def __getitem__(self, idx: int):
         entry      = self.image_list[idx]
-        img_path   = self.data_root / entry["path"]
+        # Bug1: resolve_image_path converts Windows backslashes to forward slashes
+        img_path   = resolve_image_path(self.data_root, entry["path"])
         label_name = entry["class"]
         label_idx  = self.label_to_idx[label_name]
 
@@ -104,9 +106,23 @@ class D2Dataset(Dataset):
             if img.mode != "RGB":
                 img = img.convert("RGB")
         except Exception as exc:
-            logger.warning("Skipping corrupt image %s: %s", img_path, exc)
-            # Return a blank tensor rather than crashing
-            img = Image.new("RGB", (224, 224), color=0)
+            # Bug1: do NOT silently substitute blank image -- count failures
+            if not hasattr(self, "_load_failures"):
+                self._load_failures = []
+            self._load_failures.append(str(img_path))
+            if len(self._load_failures) <= 5:
+                logger.error("Image load failure %d: %s -- %s", len(self._load_failures), img_path, exc)
+            threshold = max(1, int(len(self.image_list) * 0.005))
+            if len(self._load_failures) > threshold:
+                raise RuntimeError(
+                    "Load failures ({}) exceed 0.5%% of dataset ({}). "
+                    "First 5 failing paths: {}".format(
+                        len(self._load_failures),
+                        len(self.image_list),
+                        self._load_failures[:5],
+                    )
+                )
+            img = Image.new("RGB", (224, 224), color=0)  # sentinel only
 
         if self.transform:
             img = self.transform(img)
@@ -147,10 +163,14 @@ def build_train_transform(cfg: dict) -> transforms.Compose:
             hue=cj.get("hue", 0.1),
         ),
         transforms.RandomGrayscale(p=aug.get("grayscale_p", 0.05)),             # [ENG]
-        transforms.GaussianBlur(
-            kernel_size=kernel,
-            sigma=(0.1, 2.0),
-        ) if random.random() < aug.get("gaussian_blur_p", 0.2) else transforms.Lambda(lambda x: x),
+        # Bug5: RandomApply evaluates the p-gate per image, not once at build time.
+        # The previous conditional (if random.random() < p: GaussianBlur else Lambda)
+        # was evaluated ONCE when building the transform, so every image in an epoch
+        # saw the same choice (always blur or never blur).
+        transforms.RandomApply(
+            [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))],
+            p=aug.get("gaussian_blur_p", 0.2),
+        ),  # [ENG] kernel_size=5 (odd, required); p applied per image
         transforms.ToTensor(),
         transforms.Normalize(
             mean=cfg.get("normalization", {}).get("mean", [0.485, 0.456, 0.406]),
@@ -186,18 +206,21 @@ def evaluate_split(
     device: torch.device,
     idx_to_label: dict,
     split_name: str,
+    temperature: float = None,  # Bug8: for logging which T was used
 ) -> dict:
     """
     Evaluate model on a single data split.
-    Returns dict with macro_f1, per_class_f1, ece, top1_acc, and raw arrays.
+    Returns dict with macro_f1, per_class_f1/precision/recall/support, ece,
+    top1_acc, confusion_matrix, and raw arrays.
 
     All returned numbers are computed from actual data [R1].
     No numbers are hardcoded or fabricated.
+    Bug8: OOD ECE caveat -- T is fitted on D2_Val; OOD ECE expected to be worse.
     """
     from sklearn.metrics import (
-        classification_report,
         confusion_matrix,
         f1_score,
+        precision_recall_fscore_support,
     )
 
     model.eval()
@@ -206,7 +229,7 @@ def evaluate_split(
     with torch.no_grad():
         for inputs, targets in loader:
             inputs  = inputs.to(device)
-            logits  = model(inputs, calibrate=True)  # temperature-scaled
+            logits  = model(inputs, calibrate=True)  # uses calibrated T
             probs   = torch.softmax(logits, dim=1)
             confs, preds = probs.max(dim=1)
             all_preds.extend(preds.cpu().numpy())
@@ -222,16 +245,40 @@ def evaluate_split(
     num_cls = len(idx_to_label)
     labels  = list(range(num_cls))
 
-    macro_f1     = float(f1_score(targets, preds, average="macro", zero_division=0, labels=labels))
-    top1_acc     = float(correct.mean())
-    ece          = compute_ece(confs, correct)
-    per_cls_f1   = f1_score(targets, preds, average=None, zero_division=0, labels=labels)
-    conf_mat     = confusion_matrix(targets, preds, labels=labels)
+    macro_f1   = float(f1_score(targets, preds, average="macro", zero_division=0, labels=labels))
+    top1_acc   = float(correct.mean())
+    ece        = compute_ece(confs, correct)
+    conf_mat   = confusion_matrix(targets, preds, labels=labels)
 
-    logger.info(
-        "[%s] n=%d top1_acc=%.4f macro_F1=%.4f ECE=%.4f",
-        split_name, n, top1_acc, macro_f1, ece
+    # Bug6: per-class precision, recall, f1, support
+    prec_arr, rec_arr, f1_arr, sup_arr = precision_recall_fscore_support(
+        targets, preds, labels=labels, zero_division=0
     )
+
+    # Build per-class dict keyed by class name [Bug6]
+    per_class = {}
+    zero_support_classes = []
+    for i in labels:
+        name = idx_to_label[i]
+        per_class[name] = {
+            "precision": float(prec_arr[i]),
+            "recall":    float(rec_arr[i]),
+            "f1":        float(f1_arr[i]),
+            "support":   int(sup_arr[i]),
+        }
+        if int(sup_arr[i]) == 0:
+            zero_support_classes.append(name)
+
+    t_note = "" if temperature is None else " (T=%.4f fitted on D2_Val [ENG])" % temperature
+    logger.info(
+        "[%s] n=%d top1_acc=%.4f macro_F1=%.4f ECE=%.4f%s",
+        split_name, n, top1_acc, macro_f1, ece, t_note
+    )
+    if zero_support_classes:
+        logger.warning(
+            "[%s] %d classes have zero support: %s",
+            split_name, len(zero_support_classes), zero_support_classes
+        )
 
     return {
         "split": split_name,
@@ -239,8 +286,10 @@ def evaluate_split(
         "top1_accuracy": top1_acc,
         "macro_f1": macro_f1,
         "ece": ece,
-        "per_class_f1": per_cls_f1.tolist(),
+        "per_class": per_class,
+        "per_class_f1": f1_arr.tolist(),          # kept for backward compat
         "confusion_matrix": conf_mat.tolist(),
+        "zero_support_classes": zero_support_classes,
         "preds": preds,
         "targets": targets,
         "confs": confs,
@@ -263,39 +312,47 @@ def calibrate_temperature(
 
     Returns: optimised temperature T
     Target ECE < 0.05 is an [ENG assumption], not a literature-derived threshold [I24].
+    Bug3 fix: logits collected on CPU; optimisation happens entirely on CPU to
+    avoid CPU-parameter vs CUDA-tensor mismatch.
     """
     logger.info("Starting temperature calibration on D2_Val ...")
     model.eval()
 
-    # Collect raw logits from backbone (before temperature scaling)
+    # Collect raw backbone logits on CPU (before any temperature scaling)
     all_logits, all_targets = [], []
     with torch.no_grad():
         for inputs, targets in val_loader:
             inputs = inputs.to(device)
             logits = model.backbone(inputs)   # raw logits, no temperature
-            all_logits.append(logits.cpu())
-            all_targets.append(targets)
+            all_logits.append(logits.cpu())   # always move to CPU
+            all_targets.append(targets.cpu())
 
-    all_logits  = torch.cat(all_logits)   # (N, num_classes)
-    all_targets = torch.cat(all_targets)  # (N,)
+    all_logits  = torch.cat(all_logits)   # (N, num_classes) -- on CPU
+    all_targets = torch.cat(all_targets)  # (N,)             -- on CPU
 
-    # Reset temperature parameter and optimise
+    # Bug3: reset temperature parameter on CPU (logits are on CPU)
+    # Optimisation is cheap and device-agnostic because we work on CPU tensors.
     model.scaler.temperature = nn.Parameter(
-        torch.tensor([temperature_init], dtype=torch.float32)
+        torch.tensor([temperature_init], dtype=torch.float32)  # CPU
     )
     optimiser = optim.LBFGS([model.scaler.temperature], lr=0.1, max_iter=max_iter)
     criterion = nn.CrossEntropyLoss()
 
     def _closure():
         optimiser.zero_grad()
-        scaled = all_logits.to(device) / model.scaler.temperature.clamp(min=1e-6)
-        loss   = criterion(scaled, all_targets.to(device))
+        # All tensors are on CPU; no .to(device) needed
+        scaled = all_logits / model.scaler.temperature.clamp(min=1e-6)
+        loss   = criterion(scaled, all_targets)
         loss.backward()
         return loss
 
     optimiser.step(_closure)
 
     t_optimised = float(model.scaler.temperature.item())
+    # Move the calibrated parameter back to the model's device so forward passes work
+    model.scaler.temperature = nn.Parameter(
+        torch.tensor([t_optimised], dtype=torch.float32, device=device)
+    )
     logger.info("Calibration complete: T=%.4f", t_optimised)
     return t_optimised
 
@@ -357,15 +414,11 @@ def main():
     )
     parser.add_argument(
         "--max-train-images", type=int, default=None,
-        help="Limit training set size (for 1-epoch real-data dry run)."
+        help="Limit training set size (seeded random sample -- for 1-epoch real-data dry run)."
     )
     parser.add_argument(
-        "--max-val-images", type=int, default=None,
-        help="Limit validation set size (for 1-epoch real-data dry run)."
-    )
-    parser.add_argument(
-        "--max-test-images", type=int, default=None,
-        help="Limit Test_ID and Test_OOD set size (for 1-epoch real-data dry run)."
+        "--max-eval-images", type=int, default=None,
+        help="Limit val/Test_ID/Test_OOD set size (seeded random sample -- for dry run)."
     )
     args = parser.parse_args()
 
@@ -451,19 +504,21 @@ def main():
         "Per-class OOD metrics are unreliable [I12]. Primary evaluation uses full deduped OOD set [D16]."
     )
 
-    # Subset limits for 1-epoch real-data dry run (not used in production)
-    if args.max_train_images:
-        train_images = train_images[: args.max_train_images]
-        logger.info("DRY-RUN: Limited training to %d images", len(train_images))
-    if args.max_val_images:
-        val_images = val_images[: args.max_val_images]
-        logger.info("DRY-RUN: Limited validation to %d images", len(val_images))
-    if args.max_test_images:
-        test_id_imgs  = test_id_imgs[: args.max_test_images]
-        test_ood_imgs = test_ood_imgs[: args.max_test_images]
-        # Re-apply OOD exclusion filter on the trimmed set
+    # Bug7: subset limits use seeded random sample (not first-N slice)
+    _rng = random.Random(seed)  # deterministic subset selection
+    if args.max_train_images and len(train_images) > args.max_train_images:
+        train_images = _rng.sample(train_images, args.max_train_images)
+        logger.info("DRY-RUN: sampled %d training images (seed=%d)", len(train_images), seed)
+    if args.max_eval_images:
+        if len(val_images) > args.max_eval_images:
+            val_images = _rng.sample(val_images, args.max_eval_images)
+        if len(test_id_imgs) > args.max_eval_images:
+            test_id_imgs = _rng.sample(test_id_imgs, args.max_eval_images)
+        if len(test_ood_imgs) > args.max_eval_images:
+            test_ood_imgs = _rng.sample(test_ood_imgs, args.max_eval_images)
+        # Re-apply OOD exclusion filter on the sampled set
         test_ood_filtered = [img for img in test_ood_imgs if img["md5"] not in excl_md5s]
-        logger.info("DRY-RUN: Limited Test_ID and Test_OOD to %d images each", args.max_test_images)
+        logger.info("DRY-RUN: sampled %d eval images per split (seed=%d)", args.max_eval_images, seed)
 
     logger.info(
         "Split sizes: Train=%d Val=%d Test_ID=%d Test_OOD_full=%d Test_OOD_filtered=%d",
@@ -645,6 +700,17 @@ def main():
     with open(ckpt_dir / "temperature.json", "w") as f:
         json.dump({"temperature": temperature, "tag": "[ENG assumption -- calibrate on D2_Val]"}, f, indent=2)
 
+    # Bug4: Re-save model_best.pth (and model.pth) with the calibrated temperature
+    # baked into the state dict, so any checkpoint loaded without temperature.json
+    # still has the correct T. temperature.json remains the authoritative source
+    # (see LeafClassifier.from_checkpoint which always reads temperature.json).
+    torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
+    torch.save(model.state_dict(), ckpt_dir / "model.pth")
+    logger.info(
+        "Checkpoint re-saved with calibrated T=%.4f baked in (model.pth + model_best.pth) [Bug4]",
+        temperature
+    )
+
     # Save class_map.json and config.json into checkpoint dir
     with open(ckpt_dir / "class_map.json", "w") as f:
         json.dump({str(k): v for k, v in idx_to_label.items()}, f, indent=2)
@@ -660,16 +726,23 @@ def main():
             "tag": "[NOT MEASURED until GPU training completes]",
         }, f, indent=2)
 
-    # ── Full evaluation (all splits) ──────────────────────────────────────────
+    # ── Full evaluation (all splits) -- uses calibrated T ─────────────────────
     logger.info("--- Evaluation on all splits ---")
+    # Bug8: T was fitted on D2_Val (lab-style images). ECE on OOD splits is
+    # expected to be worse due to domain shift. This is not a bug; report with caveat.
+    logger.info(
+        "NOTE [Bug8]: T=%.4f was fitted on D2_Val only. "
+        "OOD ECE is expected to be higher due to domain shift [ENG/DATA].",
+        temperature
+    )
     results = {}
 
-    results["val"]          = evaluate_split(model, val_loader,      device, idx_to_label, "D2_Val")
-    results["test_id"]      = evaluate_split(model, test_id_loader,  device, idx_to_label, "D2_Test_ID")
+    results["val"]          = evaluate_split(model, val_loader,           device, idx_to_label, "D2_Val",              temperature)
+    results["test_id"]      = evaluate_split(model, test_id_loader,       device, idx_to_label, "D2_Test_ID",          temperature)
     # [D16] Primary OOD: full deduped set
-    results["test_ood_full"] = evaluate_split(model, test_ood_loader, device, idx_to_label, "D2_Test_OOD_full")
+    results["test_ood_full"] = evaluate_split(model, test_ood_loader,     device, idx_to_label, "D2_Test_OOD_full",    temperature)
     # Secondary OOD: exclusion-filtered
-    results["test_ood_filt"] = evaluate_split(model, test_ood_filt_loader, device, idx_to_label, "D2_Test_OOD_filtered")
+    results["test_ood_filt"] = evaluate_split(model, test_ood_filt_loader, device, idx_to_label, "D2_Test_OOD_filtered", temperature)
 
     # OOD gap [ENG spec 2a-vii]
     id_f1  = results["test_id"]["macro_f1"]
@@ -689,42 +762,64 @@ def main():
     print("=" * 60)
     for split, r in results.items():
         print(
-            f"{r['split']:30s}  n={r['n_images']:5d}  "
-            f"top1={r['top1_accuracy']:.4f}  macro_F1={r['macro_f1']:.4f}  "
-            f"ECE={r['ece']:.4f}"
+            "{:30s}  n={:5d}  top1={:.4f}  macro_F1={:.4f}  ECE={:.4f}".format(
+                r["split"], r["n_images"], r["top1_accuracy"], r["macro_f1"], r["ece"]
+            )
         )
-    print(f"OOD gap (primary):  {ood_gap:.4f}")
-    print(f"Temperature T:      {temperature:.4f}")
-    print(f"Best epoch:         {best_epoch}")
+    print("OOD gap (primary):  {:.4f}".format(ood_gap))
+    print("Temperature T:      {:.4f}  (fitted on D2_Val only [ENG])".format(temperature))
+    print("Best epoch:         {}".format(best_epoch))
+    # Bug8: explicit caveat that OOD ECE is fitted-on-val
+    print("\nNOTE: T was fitted on D2_Val (lab-style images).")
+    print("OOD ECE is expected to be higher due to domain shift. [ENG/DATA]")
+    # Bug6: zero-support OOD classes
+    for ood_split in ("test_ood_full", "test_ood_filt"):
+        zs = results[ood_split].get("zero_support_classes", [])
+        if zs:
+            print("Zero-support classes in {}: {}".format(results[ood_split]["split"], zs))
     print("\nQuality gate checks [ENG assumption thresholds]:")
-    print(f"  Test_ID macro_F1 >= 0.75: {'PASS' if id_f1 >= 0.75 else 'FAIL/NOT MET'} ({id_f1:.4f})")
-    print(f"  Test_OOD macro_F1 >= 0.50: {'PASS' if ood_f1 >= 0.50 else 'FAIL/NOT MET'} ({ood_f1:.4f})")
-    print(f"  Val ECE <= 0.05: {'PASS' if results['val']['ece'] <= 0.05 else 'FAIL/NOT MET'} ({results['val']['ece']:.4f})")
+    print("  Test_ID macro_F1 >= 0.75: {} ({:.4f})".format(
+        "PASS" if id_f1 >= 0.75 else "FAIL/NOT MET", id_f1))
+    print("  Test_OOD macro_F1 >= 0.50: {} ({:.4f})".format(
+        "PASS" if ood_f1 >= 0.50 else "FAIL/NOT MET", ood_f1))
+    print("  Val ECE <= 0.05: {} ({:.4f})".format(
+        "PASS" if results["val"]["ece"] <= 0.05 else "FAIL/NOT MET", results["val"]["ece"]))
     print("=" * 60)
 
     # ── Save metrics JSON ─────────────────────────────────────────────────────
     metrics_out = {
         "model_version": model_version,
         "temperature": temperature,
+        "temperature_note": "T fitted on D2_Val only; OOD ECE expected worse due to domain shift [Bug8/ENG/DATA]",
         "best_epoch": best_epoch,
         "splits": {},
         "ood_gap_primary": ood_gap,
         "tag": "[ALL NUMBERS COMPUTED from actual data -- R1]",
         "ood_caveat": "Test_OOD filtered set covers only ~7 of 30 classes [I12/D16]. Primary OOD uses full deduped set.",
     }
-    # Per-class label map for readability in metrics.json
-    per_class_labels = [idx_to_label[i] for i in range(num_classes)]
 
+    # Bug6: full per-class metrics keyed by class name; confusion matrix; zero-support list
+    import csv
     for split, r in results.items():
         metrics_out["splits"][split] = {
-            "n_images":           r["n_images"],
-            "top1_accuracy":      r["top1_accuracy"],
-            "macro_f1":           r["macro_f1"],
-            "ece":                r["ece"],
-            "per_class_f1":       r["per_class_f1"],
-            "per_class_labels":   per_class_labels,
-            "confusion_matrix":   r["confusion_matrix"],
+            "n_images":             r["n_images"],
+            "top1_accuracy":        r["top1_accuracy"],
+            "macro_f1":             r["macro_f1"],
+            "ece":                  r["ece"],
+            "per_class":            r["per_class"],
+            "per_class_f1":         r["per_class_f1"],      # backward compat
+            "confusion_matrix":     r["confusion_matrix"],
+            "zero_support_classes": r["zero_support_classes"],
         }
+        # Bug6: save per-split confusion matrix as CSV
+        csv_path = ckpt_dir / "confusion_matrix_{}.csv".format(split)
+        cls_names = [idx_to_label[i] for i in range(num_classes)]
+        with open(csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([""] + cls_names)  # header
+            for i, row in enumerate(r["confusion_matrix"]):
+                writer.writerow([cls_names[i]] + row)
+        logger.info("Confusion matrix CSV: %s", csv_path)
 
     metrics_path = ckpt_dir / "metrics.json"
     with open(metrics_path, "w") as f:

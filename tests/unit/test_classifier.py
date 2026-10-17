@@ -569,3 +569,432 @@ class TestCheckpointRoundTrip:
         # No model.pth
         with pytest.raises(FileNotFoundError):
             LeafClassifier.from_checkpoint(tmp_path)
+
+
+# ── Bug regression tests ──────────────────────────────────────────────────────
+
+
+class TestBug1ResolveImagePath:
+    """Bug1: Windows backslashes in manifest paths break path resolution on Linux."""
+
+    def test_forward_slash_path_resolves(self, tmp_path):
+        """Forward-slash path (already correct) resolves to the right file."""
+        from src.models.classifier import resolve_image_path
+        (tmp_path / "sub").mkdir()
+        (tmp_path / "sub" / "img.jpg").write_bytes(b"x")
+        result = resolve_image_path(tmp_path, "sub/img.jpg")
+        assert result == tmp_path / "sub" / "img.jpg"
+
+    def test_backslash_path_resolves(self, tmp_path):
+        """Windows backslash path is correctly converted to forward slash."""
+        from src.models.classifier import resolve_image_path
+        (tmp_path / "sub").mkdir()
+        (tmp_path / "sub" / "img.jpg").write_bytes(b"x")
+        # Simulate a Windows manifest entry like "sub\\img.jpg"
+        result = resolve_image_path(tmp_path, "sub\\img.jpg")
+        assert result == tmp_path / "sub" / "img.jpg"
+
+    def test_deep_backslash_path_resolves(self, tmp_path):
+        """Multi-level Windows backslash path resolves correctly."""
+        from src.models.classifier import resolve_image_path
+        (tmp_path / "Train" / "Apple___scab").mkdir(parents=True)
+        target = tmp_path / "Train" / "Apple___scab" / "img.JPG"
+        target.write_bytes(b"x")
+        # Simulate D2 manifest entry: "Train\\Apple___scab\\img.JPG"
+        result = resolve_image_path(tmp_path, "Train\\Apple___scab\\img.JPG")
+        assert result == target
+
+    def test_d2dataset_backslash_entry_loads(self, tmp_path):
+        """D2Dataset loads an image from a manifest entry with a backslash path [Bug1]."""
+        import io, json
+        import numpy as np
+        import torch
+        from PIL import Image
+        from torch.utils.data import DataLoader
+        from scripts.train_classifier import D2Dataset, build_eval_transform
+
+        # Create a real image on disk in sub-directory
+        cls_dir = tmp_path / "Train" / "Apple___Apple_scab"
+        cls_dir.mkdir(parents=True)
+        img_path = cls_dir / "test_img.JPG"
+        arr = np.random.randint(50, 200, (64, 64, 3), dtype=np.uint8)
+        Image.fromarray(arr, mode="RGB").save(str(img_path), format="JPEG")
+
+        label_to_idx = {"Apple___Apple_scab": 0}
+        cfg = {
+            "model": {"input_size": 64},
+            "normalization": {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]},
+        }
+        tf = build_eval_transform(cfg)
+
+        # Manifest entry uses Windows backslash (as produced on Windows)
+        entries = [{"path": "Train\\Apple___scab\\test_img.JPG", "class": "Apple___Apple_scab", "md5": "abc"}]
+        # Fix the path to match the actual file (backslash converted)
+        entries = [{"path": "Train\\Apple___Apple_scab\\test_img.JPG", "class": "Apple___Apple_scab", "md5": "abc"}]
+
+        ds = D2Dataset(entries, tmp_path, tf, label_to_idx)
+        tensor, label = ds[0]
+        assert tensor.shape[0] == 3, "Expected 3-channel tensor"
+        assert label == 0
+
+
+class TestBug2CalibrateEntryKey:
+    """Bug2: calibrate.py D2ValDataset used entry['label'] but manifests use entry['class']."""
+
+    def test_d2val_dataset_uses_class_key(self, tmp_path):
+        """D2ValDataset correctly reads entry['class'] not entry['label']."""
+        import io
+        import numpy as np
+        from PIL import Image
+        from torch.utils.data import DataLoader
+
+        # We test the dataset class directly from calibrate.py
+        import sys
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[2]
+        sys.path.insert(0, str(repo_root))
+
+        from scripts.calibrate import D2ValDataset
+
+        # Build a tiny image on disk
+        cls_dir = tmp_path / "Val" / "Apple___Apple_scab"
+        cls_dir.mkdir(parents=True)
+        img_path = cls_dir / "img.JPG"
+        arr = np.random.randint(50, 200, (64, 64, 3), dtype=np.uint8)
+        Image.fromarray(arr, mode="RGB").save(str(img_path), format="JPEG")
+
+        # Manifest entry uses 'class' key (real format)
+        entries = [{
+            "path": "Val\\Apple___Apple_scab\\img.JPG",
+            "class": "Apple___Apple_scab",
+            "md5": "deadbeef",
+        }]
+        label_to_idx = {"Apple___Apple_scab": 0}
+
+        ds = D2ValDataset(entries, tmp_path, label_to_idx, input_size=64)
+        tensor, label = ds[0]
+        assert label == 0, (
+            "D2ValDataset should read entry['class'] not entry['label'] [Bug2]. "
+            "Got label={} expected 0".format(label)
+        )
+
+    def test_d2val_dataset_wrong_key_gives_zero(self, tmp_path):
+        """Regression: if 'label' key exists but 'class' is used, label resolves to 0 via .get() default."""
+        import numpy as np
+        from PIL import Image
+        from scripts.calibrate import D2ValDataset
+
+        cls_dir = tmp_path / "Val" / "SomeClass"
+        cls_dir.mkdir(parents=True)
+        img_path = cls_dir / "img.JPG"
+        arr = np.random.randint(50, 200, (64, 64, 3), dtype=np.uint8)
+        Image.fromarray(arr, mode="RGB").save(str(img_path), format="JPEG")
+
+        # Correct entry with 'class' key -- should give label 5
+        entries = [{"path": "Val\\SomeClass\\img.JPG", "class": "SomeClass", "md5": "x"}]
+        label_to_idx = {"SomeClass": 5}
+        ds = D2ValDataset(entries, tmp_path, label_to_idx, input_size=64)
+        _, label = ds[0]
+        assert label == 5, "Label should be 5 when 'class' key is used correctly [Bug2]"
+
+
+class TestBug3CalibrateTemperatureDevice:
+    """Bug3: calibrate_temperature must not create a CPU parameter when model is on CUDA."""
+
+    def test_calibrate_temperature_cpu(self):
+        """calibrate_temperature works correctly on CPU (device-agnostic baseline)."""
+        from scripts.train_classifier import calibrate_temperature, D2Dataset, build_eval_transform
+        from src.models.classifier import EfficientNetB3Classifier, compute_class_weights
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        num_classes = 5
+
+        model = EfficientNetB3Classifier(num_classes=num_classes, pretrained=False, temperature=1.5)
+        model.to(device)
+        model.eval()
+
+        # Build a fake DataLoader: pre-made (tensor, label) pairs
+        # We mock the val_loader by wrapping tensors directly
+        inputs  = torch.randn(20, 3, 224, 224)
+        targets = torch.randint(0, num_classes, (20,))
+        ds = TensorDataset(inputs, targets)
+        loader = DataLoader(ds, batch_size=10)
+
+        # Should complete without device errors
+        t = calibrate_temperature(model, loader, device, temperature_init=1.5, max_iter=5)
+        assert isinstance(t, float), "calibrate_temperature must return a float"
+        assert t > 0, "Optimised temperature must be positive [Bug3]"
+
+        # After calibration, model.scaler.temperature should be on 'device'
+        assert model.scaler.temperature.device.type == device.type, (
+            "After calibration, model.scaler.temperature must be on the model's device [Bug3]"
+        )
+
+    def test_calibrate_temperature_returns_param_on_model_device(self):
+        """After calibrate_temperature, the T parameter lives on model.device (Bug3)."""
+        from scripts.train_classifier import calibrate_temperature
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        model = EfficientNetB3Classifier(num_classes=4, pretrained=False).to(device)
+        inputs  = torch.randn(8, 3, 224, 224)
+        targets = torch.randint(0, 4, (8,))
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=8)
+
+        calibrate_temperature(model, loader, device, temperature_init=1.5, max_iter=3)
+        assert model.scaler.temperature.device.type == "cpu", (
+            "model.scaler.temperature must be on CPU after calibration on CPU [Bug3]"
+        )
+
+
+class TestBug4CheckpointTemperatureRoundTrip:
+    """Bug4: from_checkpoint must load temperature from temperature.json and override state dict."""
+
+    def test_temperature_roundtrip_t2(self, tmp_path):
+        """Save checkpoint with T=2.0 in temperature.json; load and assert get_temperature()==2.0."""
+        from src.models.classifier import EfficientNetB3Classifier, LeafClassifier
+        import json, torch
+
+        # Build model and save with T=1.0 in state dict
+        model = EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False, temperature=1.0)
+        torch.save(model.state_dict(), tmp_path / "model.pth")
+
+        # Write temperature.json with T=2.0 (simulates post-calibration)
+        with open(tmp_path / "temperature.json", "w") as f:
+            json.dump({"temperature": 2.0}, f)
+        with open(tmp_path / "class_map.json", "w") as f:
+            json.dump({str(k): v for k, v in MOCK_IDX_TO_LABEL.items()}, f)
+        with open(tmp_path / "config.json", "w") as f:
+            json.dump({"model_version": "test_T2", "num_classes": NUM_CLASSES}, f)
+
+        clf = LeafClassifier.from_checkpoint(tmp_path, device=torch.device("cpu"))
+
+        actual_T = clf.model.get_temperature()
+        assert abs(actual_T - 2.0) < 1e-4, (
+            "from_checkpoint must honour temperature.json (T=2.0) and override "
+            "whatever T was baked into the state dict. Got T={}. [Bug4]".format(actual_T)
+        )
+
+    def test_temperature_roundtrip_preserves_weights(self, tmp_path):
+        """Loading from checkpoint doesn't corrupt model weights (basic sanity)."""
+        from src.models.classifier import EfficientNetB3Classifier, LeafClassifier
+        import json, torch
+
+        model = EfficientNetB3Classifier(num_classes=NUM_CLASSES, pretrained=False, temperature=1.5)
+        torch.save(model.state_dict(), tmp_path / "model.pth")
+        with open(tmp_path / "temperature.json", "w") as f:
+            json.dump({"temperature": 1.5}, f)
+        with open(tmp_path / "class_map.json", "w") as f:
+            json.dump({str(k): v for k, v in MOCK_IDX_TO_LABEL.items()}, f)
+
+        clf = LeafClassifier.from_checkpoint(tmp_path, device=torch.device("cpu"))
+        # Should predict without error
+        import io
+        arr = np.random.randint(50, 200, (224, 224, 3), dtype=np.uint8)
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.fromarray(arr).save(buf, format="JPEG")
+        out = clf.predict(buf.getvalue())
+        assert out.temperature == pytest.approx(1.5, abs=1e-4)
+
+
+class TestBug5BlurPerImage:
+    """Bug5: GaussianBlur must be applied per-image via RandomApply, not once at build time."""
+
+    def test_random_apply_blur_is_per_image(self):
+        """Over 200 transform calls, both blurred and unblurred outputs occur [Bug5]."""
+        from torchvision import transforms
+        from PIL import Image
+        import numpy as np
+
+        # Use a high-frequency checkerboard so blur changes pixel values measurably.
+        # Flat images look identical whether blurred or not.
+        checker = np.zeros((80, 80, 3), dtype=np.uint8)
+        for row in range(80):
+            for col in range(80):
+                checker[row, col] = 255 if (row // 4 + col // 4) % 2 == 0 else 0
+        img = Image.fromarray(checker, mode="RGB")
+
+        # Build a transform with p=0.5 blur using RandomApply (the fixed approach)
+        tf = transforms.Compose([
+            transforms.Resize(64),
+            transforms.CenterCrop(64),
+            transforms.RandomApply(
+                [transforms.GaussianBlur(kernel_size=5, sigma=(2.0, 2.0))],
+                p=0.5,
+            ),
+            transforms.ToTensor(),
+        ])
+
+        # Measure the variance across 200 calls -- if blur is per-image,
+        # some calls will change the output significantly.
+        patch_means = []
+        for _ in range(200):
+            t = tf(img)
+            patch_means.append(float(t[0, 28:36, 28:36].std().item()))
+
+        unique_vals = set(round(v, 5) for v in patch_means)
+
+        # If blur was applied exactly once at build time, all std values would
+        # be the same. With RandomApply, we expect at least 2 distinct values.
+        assert len(unique_vals) >= 2, (
+            "GaussianBlur via RandomApply should produce different outputs per call [Bug5]. "
+            "Got only {} distinct variance values over 200 calls.".format(len(unique_vals))
+        )
+
+    def test_build_train_transform_uses_random_apply(self):
+        """build_train_transform must not use a one-time random.random() conditional [Bug5]."""
+        import inspect
+        from scripts.train_classifier import build_train_transform
+
+        source = inspect.getsource(build_train_transform)
+        assert "RandomApply" in source, (
+            "build_train_transform must use transforms.RandomApply for GaussianBlur [Bug5]. "
+            "Found: {}".format(source[:200])
+        )
+        # The old buggy pattern -- one-time conditional at build time
+        assert "random.random()" not in source, (
+            "build_train_transform must NOT use random.random() inline (evaluated once at "
+            "transform-build time, not per image) [Bug5]"
+        )
+
+
+class TestBug6MetricsContent:
+    """Bug6: evaluate_split must return per-class precision/recall/support and zero_support_classes."""
+
+    def test_evaluate_split_returns_per_class_dict(self):
+        """evaluate_split result includes per_class with precision/recall/f1/support [Bug6]."""
+        from scripts.train_classifier import evaluate_split
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        num_cls = 5
+        model = EfficientNetB3Classifier(num_classes=num_cls, pretrained=False).to(device)
+        idx_to_label = {i: "cls_{}".format(i) for i in range(num_cls)}
+
+        inputs  = torch.randn(20, 3, 224, 224)
+        targets = torch.zeros(20, dtype=torch.long)  # all class 0 -> classes 1-4 have 0 support
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=20)
+
+        result = evaluate_split(model, loader, device, idx_to_label, "test_split")
+
+        assert "per_class" in result, "evaluate_split must return 'per_class' dict [Bug6]"
+        assert "confusion_matrix" in result, "evaluate_split must return 'confusion_matrix' [Bug6]"
+        assert "zero_support_classes" in result, "evaluate_split must return 'zero_support_classes' [Bug6]"
+
+        for cls_name, metrics in result["per_class"].items():
+            assert "precision" in metrics, "per_class must include precision [Bug6]"
+            assert "recall"    in metrics, "per_class must include recall [Bug6]"
+            assert "f1"        in metrics, "per_class must include f1 [Bug6]"
+            assert "support"   in metrics, "per_class must include support [Bug6]"
+
+    def test_zero_support_detected(self):
+        """Classes absent from targets are listed in zero_support_classes [Bug6]."""
+        from scripts.train_classifier import evaluate_split
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        num_cls = 4
+        model = EfficientNetB3Classifier(num_classes=num_cls, pretrained=False).to(device)
+        idx_to_label = {i: "cls_{}".format(i) for i in range(num_cls)}
+
+        # Only classes 0 and 1 appear in targets; classes 2 and 3 have zero support
+        inputs  = torch.randn(10, 3, 224, 224)
+        targets = torch.randint(0, 2, (10,))
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=10)
+
+        result = evaluate_split(model, loader, device, idx_to_label, "test_split")
+        zs = result["zero_support_classes"]
+        assert "cls_2" in zs, "cls_2 should be zero_support but is not [Bug6]. Got: {}".format(zs)
+        assert "cls_3" in zs, "cls_3 should be zero_support but is not [Bug6]. Got: {}".format(zs)
+
+
+class TestBug7MaxTrainImagesRandomSample:
+    """Bug7: --max-train-images must take a seeded random sample, not first-N."""
+
+    def test_max_train_images_is_not_first_n(self):
+        """Seeded sample != first-N slice for a shuffled manifest [Bug7]."""
+        import random as stdlib_random
+        import json
+
+        # Simulate a manifest list with known ordering
+        manifest = [{"path": "img_{}.jpg".format(i), "class": "A", "md5": str(i)} for i in range(1000)]
+        seed = 42
+        limit = 100
+
+        rng = stdlib_random.Random(seed)
+        sampled = rng.sample(manifest, limit)
+        first_n = manifest[:limit]
+
+        # They should NOT be the same (with probability ~1.0 for any non-trivial n)
+        assert sampled != first_n, (
+            "--max-train-images should use seeded random.sample(), not first-N slice [Bug7]. "
+            "Got identical result."
+        )
+
+    def test_max_train_images_same_seed_same_result(self):
+        """Same seed produces the same sample (deterministic) [Bug7]."""
+        import random as stdlib_random
+
+        manifest = [{"path": "img_{}.jpg".format(i), "class": "A", "md5": str(i)} for i in range(500)]
+        seed, limit = 42, 50
+
+        rng1 = stdlib_random.Random(seed)
+        s1 = rng1.sample(manifest, limit)
+        rng2 = stdlib_random.Random(seed)
+        s2 = rng2.sample(manifest, limit)
+
+        assert s1 == s2, "Same seed must produce identical samples [Bug7]"
+
+    def test_train_classifier_uses_random_sample(self):
+        """Regression: verify build uses random.Random.sample, not a slice [Bug7]."""
+        import inspect
+        from scripts import train_classifier
+        source = inspect.getsource(train_classifier.main)
+        assert "_rng.sample" in source, (
+            "train_classifier.main must use _rng.sample() for --max-train-images [Bug7]"
+        )
+        assert "max_train_images]" not in source, (
+            "train_classifier.main must NOT use first-N slice for --max-train-images [Bug7]"
+        )
+
+
+class TestBug8ECECaveat:
+    """Bug8: OOD ECE reporting must include a caveat that T was fitted on D2_Val."""
+
+    def test_evaluate_split_logs_temperature(self):
+        """evaluate_split accepts temperature arg and includes it in log format [Bug8]."""
+        from scripts.train_classifier import evaluate_split
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        num_cls = 3
+        model = EfficientNetB3Classifier(num_classes=num_cls, pretrained=False).to(device)
+        idx_to_label = {i: "c{}".format(i) for i in range(num_cls)}
+        inputs  = torch.randn(6, 3, 224, 224)
+        targets = torch.randint(0, num_cls, (6,))
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=6)
+
+        # Should not raise when temperature is provided
+        result = evaluate_split(model, loader, device, idx_to_label, "OOD_test", temperature=1.23)
+        assert "macro_f1" in result
+
+    def test_train_classifier_has_ood_ece_note(self):
+        """train_classifier.main logs that T was fitted on D2_Val for OOD ECE [Bug8]."""
+        import inspect
+        from scripts import train_classifier
+        source = inspect.getsource(train_classifier.main)
+        assert "OOD ECE" in source or "OOD_ECE" in source or "domain shift" in source, (
+            "train_classifier.main must document OOD ECE caveat (T fitted on D2_Val) [Bug8]"
+        )

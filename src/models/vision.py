@@ -16,6 +16,7 @@ from src.models.classifier import (  # noqa: F401
     compute_ece,
     preprocess_image,
     check_image_quality,
+    resolve_image_path,
     SEVERITY_NOTE,
 )
 

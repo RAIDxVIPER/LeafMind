@@ -61,6 +61,26 @@ _DEFAULT_BLUR_LAP   = 100.0         # Laplacian variance < threshold -> blurry [
                                     # NOTE: uncalibrated -- see L15/GAP
 
 
+# ── Cross-platform path helper [Bug1] ────────────────────────────────────────
+
+def resolve_image_path(data_root: Path, rel: str) -> Path:
+    """
+    Resolve a manifest-relative image path to an absolute Path.
+
+    D2 manifests were generated on Windows and store paths with backslash
+    separators (e.g. "Val\\Apple___Apple_scab\\img.JPG"). On Linux/Kaggle/Mac,
+    pathlib treats "\\" as a literal filename character rather than a separator,
+    so images cannot be found.
+
+    This helper replaces all backslashes with forward slashes before constructing
+    the Path, making it safe on every OS.
+
+    Usage:
+        img_path = resolve_image_path(data_root, entry["path"])
+    """
+    return data_root / rel.replace("\\", "/")
+
+
 # ── Quality gate helpers ──────────────────────────────────────────────────────
 
 def _laplacian_variance(pil_img: Image.Image) -> float:
@@ -392,6 +412,13 @@ class LeafClassifier:
 
         state = torch.load(model_path, map_location=device, weights_only=True)
         model.load_state_dict(state)
+
+        # Bug4: temperature.json is authoritative. After load_state_dict the
+        # scaler's temperature may reflect whatever was last saved into the
+        # state dict (which could be an uncalibrated default). Explicitly
+        # overwrite it from temperature.json so inference always uses the
+        # calibrated value, regardless of what is in the .pth file.
+        model.scaler.temperature.data.fill_(temperature)
         model.eval()
 
         logger.info(
