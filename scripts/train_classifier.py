@@ -296,21 +296,27 @@ def evaluate_split(
     # Build per-class dict keyed by class name [Bug6]
     per_class = {}
     zero_support_classes = []
+    supported_f1s = []
     for i in labels:
         name = idx_to_label[i]
+        support = int(sup_arr[i])
         per_class[name] = {
             "precision": float(prec_arr[i]),
             "recall":    float(rec_arr[i]),
             "f1":        float(f1_arr[i]),
-            "support":   int(sup_arr[i]),
+            "support":   support,
         }
-        if int(sup_arr[i]) == 0:
+        if support == 0:
             zero_support_classes.append(name)
+        else:
+            supported_f1s.append(float(f1_arr[i]))
+
+    macro_f1_supported_classes = float(np.mean(supported_f1s)) if supported_f1s else 0.0
 
     t_note = "" if temperature is None else " (T=%.4f fitted on D2_Val [ENG])" % temperature
     logger.info(
-        "[%s] n=%d top1_acc=%.4f macro_F1=%.4f ECE=%.4f%s",
-        split_name, n, top1_acc, macro_f1, ece, t_note
+        "[%s] n=%d top1_acc=%.4f macro_F1=%.4f (supported_F1=%.4f) ECE=%.4f%s",
+        split_name, n, top1_acc, macro_f1, macro_f1_supported_classes, ece, t_note
     )
     if zero_support_classes:
         logger.warning(
@@ -323,6 +329,7 @@ def evaluate_split(
         "n_images": n,
         "top1_accuracy": top1_acc,
         "macro_f1": macro_f1,
+        "macro_f1_supported_classes": macro_f1_supported_classes,
         "ece": ece,
         "per_class": per_class,
         "per_class_f1": f1_arr.tolist(),          # kept for backward compat
@@ -463,6 +470,10 @@ def main():
     parser.add_argument(
         "--no-calibrate", action="store_true",
         help="Skip temperature calibration step."
+    )
+    parser.add_argument(
+        "--eval-only", action="store_true",
+        help="Skip training, load model_best.pth (or model.pth) from --checkpoint-dir, calibrate and evaluate."
     )
     parser.add_argument(
         "--max-train-images", type=int, default=None,
@@ -606,10 +617,13 @@ def main():
     test_ood_ds = D2Dataset(test_ood_imgs,    data_root, eval_tf, label_to_idx)
     test_ood_filt_ds = D2Dataset(test_ood_filtered, data_root, eval_tf, label_to_idx)
 
-    train_loader = DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True,
-        num_workers=num_workers, pin_memory=pin_memory,
-    )
+    if not args.eval_only:
+        train_loader = DataLoader(
+            train_ds, batch_size=batch_size, shuffle=True,
+            num_workers=num_workers, pin_memory=pin_memory,
+        )
+    else:
+        train_loader = None
     val_loader = DataLoader(
         val_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=pin_memory,
@@ -660,84 +674,100 @@ def main():
     best_epoch      = -1
     train_history   = []
 
-    for epoch in range(1, epochs + 1):
-        model.train()
-        epoch_loss = 0.0
-        n_batches  = 0
-        t0 = time.time()
+    if not args.eval_only:
+        for epoch in range(1, epochs + 1):
+            model.train()
+            epoch_loss = 0.0
+            n_batches  = 0
+            t0 = time.time()
 
-        for batch_idx, (inputs, targets) in enumerate(train_loader):
-            inputs, targets = inputs.to(device), targets.to(device)
-            optimiser.zero_grad()
-            # Training: raw logits (no temperature scaling in loss) [ENG]
-            logits = model(inputs, calibrate=False)
-            loss   = criterion(logits, targets)
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)  # [ENG]
-            optimiser.step()
-            epoch_loss += loss.item()
-            n_batches  += 1
+            for batch_idx, (inputs, targets) in enumerate(train_loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                optimiser.zero_grad()
+                # Training: raw logits (no temperature scaling in loss) [ENG]
+                logits = model(inputs, calibrate=False)
+                loss   = criterion(logits, targets)
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)  # [ENG]
+                optimiser.step()
+                epoch_loss += loss.item()
+                n_batches  += 1
 
-            if (batch_idx + 1) % 100 == 0:
-                logger.info(
-                    "Epoch %d/%d  batch %d/%d  loss=%.4f  lr=%.2e",
-                    epoch, epochs, batch_idx + 1, len(train_loader),
-                    loss.item(), scheduler.get_last_lr()[0]
-                )
+                if (batch_idx + 1) % 100 == 0:
+                    logger.info(
+                        "Epoch %d/%d  batch %d/%d  loss=%.4f  lr=%.2e",
+                        epoch, epochs, batch_idx + 1, len(train_loader),
+                        loss.item(), scheduler.get_last_lr()[0]
+                    )
 
-        scheduler.step()
-        avg_loss = epoch_loss / max(n_batches, 1)
-        elapsed  = time.time() - t0
+            scheduler.step()
+            avg_loss = epoch_loss / max(n_batches, 1)
+            elapsed  = time.time() - t0
 
-        # ── Validation ────────────────────────────────────────────────────────
-        from sklearn.metrics import f1_score as _f1
-        model.eval()
-        val_preds, val_targets = [], []
-        with torch.no_grad():
-            for inputs, targets in val_loader:
-                inputs = inputs.to(device)
-                logits = model(inputs, calibrate=True)
-                probs  = torch.softmax(logits, dim=1)
-                preds  = probs.argmax(dim=1)
-                val_preds.extend(preds.cpu().numpy())
-                val_targets.extend(targets.cpu().numpy())
-        val_f1 = float(_f1(
-            np.array(val_targets), np.array(val_preds),
-            average="macro", zero_division=0, labels=list(range(num_classes))
-        ))
+            # ── Validation ────────────────────────────────────────────────────────
+            from sklearn.metrics import f1_score as _f1
+            model.eval()
+            val_preds, val_targets = [], []
+            with torch.no_grad():
+                for inputs, targets in val_loader:
+                    inputs = inputs.to(device)
+                    logits = model(inputs, calibrate=True)
+                    probs  = torch.softmax(logits, dim=1)
+                    preds  = probs.argmax(dim=1)
+                    val_preds.extend(preds.cpu().numpy())
+                    val_targets.extend(targets.cpu().numpy())
+            val_f1 = float(_f1(
+                np.array(val_targets), np.array(val_preds),
+                average="macro", zero_division=0, labels=list(range(num_classes))
+            ))
 
-        logger.info(
-            "Epoch %d/%d  avg_loss=%.4f  val_macro_F1=%.4f  time=%.1fs",
-            epoch, epochs, avg_loss, val_f1, elapsed
-        )
-        train_history.append({"epoch": epoch, "loss": avg_loss, "val_macro_f1": val_f1})
+            logger.info(
+                "Epoch %d/%d  avg_loss=%.4f  val_macro_F1=%.4f  time=%.1fs",
+                epoch, epochs, avg_loss, val_f1, elapsed
+            )
+            train_history.append({"epoch": epoch, "loss": avg_loss, "val_macro_f1": val_f1})
 
-        # ── Early stopping + best model save ─────────────────────────────────
-        if val_f1 > best_val_f1:
-            best_val_f1    = val_f1
-            best_epoch     = epoch
-            no_improve_cnt = 0
-            torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
-            logger.info("Best model saved (epoch=%d val_macro_F1=%.4f)", epoch, best_val_f1)
-        else:
-            no_improve_cnt += 1
-            if no_improve_cnt >= patience:
-                logger.info(
-                    "Early stopping at epoch %d (no improvement for %d epochs [ENG])",
-                    epoch, patience
-                )
-                break
+            # ── Early stopping + best model save ─────────────────────────────────
+            if val_f1 > best_val_f1:
+                best_val_f1    = val_f1
+                best_epoch     = epoch
+                no_improve_cnt = 0
+                torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
+                logger.info("Best model saved (epoch=%d val_macro_F1=%.4f)", epoch, best_val_f1)
+            else:
+                no_improve_cnt += 1
+                if no_improve_cnt >= patience:
+                    logger.info(
+                        "Early stopping at epoch %d (no improvement for %d epochs [ENG])",
+                        epoch, patience
+                    )
+                    break
 
-    # Save final model
-    torch.save(model.state_dict(), ckpt_dir / "model.pth")
-    logger.info("Final model saved to %s/model.pth", ckpt_dir)
+        # Save final model
+        torch.save(model.state_dict(), ckpt_dir / "model.pth")
+        logger.info("Final model saved to %s/model.pth", ckpt_dir)
+    else:
+        logger.info("--eval-only specified: skipping training phase.")
+        if (ckpt_dir / "config.json").exists():
+            try:
+                with open(ckpt_dir / "config.json") as f:
+                    saved_cfg = json.load(f)
+                    best_epoch = saved_cfg.get("best_epoch", best_epoch)
+                    best_val_f1 = saved_cfg.get("best_val_macro_f1", best_val_f1)
+            except Exception:
+                pass
 
-    # Load best model for evaluation
+    # Load model for evaluation: model_best.pth or model.pth
     best_path = ckpt_dir / "model_best.pth"
-    if best_path.exists():
-        state = torch.load(best_path, map_location=device, weights_only=True)
+    model_path = best_path if best_path.exists() else ckpt_dir / "model.pth"
+    if model_path.exists():
+        state = torch.load(model_path, map_location=device, weights_only=True)
         model.load_state_dict(state)
-        logger.info("Loaded best checkpoint from epoch %d for evaluation", best_epoch)
+        logger.info("Loaded checkpoint from %s for evaluation", model_path)
+    elif args.eval_only:
+        raise FileNotFoundError(
+            f"--eval-only specified, but neither model_best.pth nor model.pth found in {ckpt_dir}"
+        )
 
     # ── Temperature calibration on D2_Val ─────────────────────────────────────
     temperature = float(cfg.get("calibration", {}).get("temperature_init", 1.5))
@@ -819,11 +849,18 @@ def main():
     print("LEAFMIND C2 TRAINING SUMMARY")
     print("=" * 60)
     for split, r in results.items():
-        print(
-            "{:30s}  n={:5d}  top1={:.4f}  macro_F1={:.4f}  ECE={:.4f}".format(
-                r["split"], r["n_images"], r["top1_accuracy"], r["macro_f1"], r["ece"]
+        if "ood" in split.lower():
+            print(
+                "{:30s}  n={:5d}  top1={:.4f}  macro_F1={:.4f} (supported_F1={:.4f})  ECE={:.4f}".format(
+                    r["split"], r["n_images"], r["top1_accuracy"], r["macro_f1"], r["macro_f1_supported_classes"], r["ece"]
+                )
             )
-        )
+        else:
+            print(
+                "{:30s}  n={:5d}  top1={:.4f}  macro_F1={:.4f}  ECE={:.4f}".format(
+                    r["split"], r["n_images"], r["top1_accuracy"], r["macro_f1"], r["ece"]
+                )
+            )
     print("OOD gap (primary):  {:.4f}".format(ood_gap))
     print("Temperature T:      {:.4f}  (fitted on D2_Val only [ENG])".format(temperature))
     print("Best epoch:         {}".format(best_epoch))
@@ -873,14 +910,15 @@ def main():
     import csv
     for split, r in results.items():
         metrics_out["splits"][split] = {
-            "n_images":             r["n_images"],
-            "top1_accuracy":        r["top1_accuracy"],
-            "macro_f1":             r["macro_f1"],
-            "ece":                  r["ece"],
-            "per_class":            r["per_class"],
-            "per_class_f1":         r["per_class_f1"],      # backward compat
-            "confusion_matrix":     r["confusion_matrix"],
-            "zero_support_classes": r["zero_support_classes"],
+            "n_images":                   r["n_images"],
+            "top1_accuracy":              r["top1_accuracy"],
+            "macro_f1":                   r["macro_f1"],
+            "macro_f1_supported_classes": r["macro_f1_supported_classes"],
+            "ece":                        r["ece"],
+            "per_class":                  r["per_class"],
+            "per_class_f1":               r["per_class_f1"],      # backward compat
+            "confusion_matrix":           r["confusion_matrix"],
+            "zero_support_classes":       r["zero_support_classes"],
         }
         # Bug6: save per-split confusion matrix as CSV
         csv_path = ckpt_dir / "confusion_matrix_{}.csv".format(split)
@@ -898,8 +936,9 @@ def main():
     logger.info("Metrics saved to %s", metrics_path)
 
     # Save training history
-    with open(ckpt_dir / "train_history.json", "w") as f:
-        json.dump(train_history, f, indent=2)
+    if not args.eval_only:
+        with open(ckpt_dir / "train_history.json", "w") as f:
+            json.dump(train_history, f, indent=2)
 
 
 if __name__ == "__main__":

@@ -506,13 +506,17 @@ def fit_temperature(
     Optimise temperature scalar T via LBFGS to minimise cross-entropy NLL.
     Method: Guo et al. (2017) "On Calibration of Modern Neural Networks".
 
-    Optimises log_T (T = exp(log_T)) with LBFGS(lr=1.0, max_iter=50,
-    line_search_fn="strong_wolfe") on CPU float64 logits.
-
-    Safety guards:
-    - Clamps fitted T to [0.05, 20.0] and logs when clamped.
-    - Computes NLL at T=1.0 and at fitted T; returns fitted T only if its
-      NLL is strictly lower than NLL at T=1.0. Otherwise returns 1.0 and logs warning.
+    Robust fitting to handle extreme eval-mode logits:
+    1. Computes per-sample NLL at T=1 and excludes worst 1% of samples (at least 1 if n>=100)
+       from the fitting set only. Logs how many were dropped and their NLL statistics.
+    2. Optimises log_T (T = exp(log_T)) with LBFGS(lr=1.0, max_iter=max_iter,
+       line_search_fn="strong_wolfe") on CPU float64 logits of the trimmed set.
+    3. Clamps fitted T to [0.25, 5.0] [ENG assumption] and logs a loud warning pointing
+       to scripts/diag_logits.py when clamped.
+    4. Computes pre/post NLL and ECE on both all samples and trimmed samples, and logs them.
+    5. Guards:
+       - If post-fit ECE (on all samples) is higher than ECE at T=1.0, returns 1.0 and warns.
+       - If post-fit NLL (on trimmed set) >= pre-fit NLL, returns 1.0 and warns.
     """
     if not isinstance(logits, torch.Tensor):
         logits = torch.as_tensor(logits)
@@ -522,11 +526,52 @@ def fit_temperature(
     # Move to CPU float64 for stable numerical optimization
     logits_64 = logits.detach().cpu().to(torch.float64)
     labels_64 = labels.detach().cpu().to(torch.long)
+    n_samples = len(labels_64)
 
-    criterion = nn.CrossEntropyLoss()
-    nll_t1 = float(criterion(logits_64, labels_64).item())
+    # 1. Per-sample NLL at T=1.0 to find worst 1%
+    criterion_none = nn.CrossEntropyLoss(reduction="none")
+    sample_nlls_t1 = criterion_none(logits_64, labels_64)
 
-    # Parameterize log_t so T = exp(log_t) is strictly positive
+    if n_samples >= 100:
+        k_drop = max(1, int(round(0.01 * n_samples)))
+    else:
+        k_drop = 0
+
+    if k_drop > 0:
+        sorted_indices = torch.argsort(sample_nlls_t1, descending=True)
+        dropped_indices = sorted_indices[:k_drop]
+        keep_indices = sorted_indices[k_drop:]
+        dropped_nlls = sample_nlls_t1[dropped_indices]
+        logger.info(
+            "Trimming worst %d samples (1%% of %d) from calibration fitting set. "
+            "Dropped NLLs: min=%.4f, max=%.4f, mean=%.4f (first 5: %s)",
+            k_drop, n_samples,
+            float(dropped_nlls.min().item()),
+            float(dropped_nlls.max().item()),
+            float(dropped_nlls.mean().item()),
+            [round(float(v), 3) for v in dropped_nlls[:5].tolist()]
+        )
+        fit_logits = logits_64[keep_indices]
+        fit_labels = labels_64[keep_indices]
+    else:
+        fit_logits = logits_64
+        fit_labels = labels_64
+
+    def _eval_metrics(lg, lb, temp):
+        scaled = lg / max(temp, 1e-6)
+        loss = float(nn.CrossEntropyLoss()(scaled, lb).item())
+        probs = torch.softmax(scaled, dim=1).numpy()
+        confs = probs.max(axis=1)
+        preds = probs.argmax(axis=1)
+        corr = (preds == lb.numpy()).astype(float)
+        ece = compute_ece(confs, corr)
+        return loss, ece
+
+    # Pre-calibration metrics
+    all_nll_pre, all_ece_pre = _eval_metrics(logits_64, labels_64, 1.0)
+    trim_nll_pre, trim_ece_pre = _eval_metrics(fit_logits, fit_labels, 1.0)
+
+    # 2. Fit T on the trimmed set in log-space
     log_t = nn.Parameter(torch.zeros(1, dtype=torch.float64))
     optimizer = optim.LBFGS(
         [log_t],
@@ -534,12 +579,13 @@ def fit_temperature(
         max_iter=max_iter,
         line_search_fn="strong_wolfe",
     )
+    criterion_mean = nn.CrossEntropyLoss()
 
     def closure():
         optimizer.zero_grad()
         t = torch.exp(log_t)
-        scaled = logits_64 / t
-        loss = criterion(scaled, labels_64)
+        scaled = fit_logits / t
+        loss = criterion_mean(scaled, fit_labels)
         loss.backward()
         return loss
 
@@ -552,26 +598,54 @@ def fit_temperature(
     raw_t = float(torch.exp(log_t).item())
     fitted_t = raw_t
 
-    if fitted_t < 0.05:
-        logger.warning("Fitted temperature %.4f clamped to min 0.05", fitted_t)
-        fitted_t = 0.05
-    elif fitted_t > 20.0:
-        logger.warning("Fitted temperature %.4f clamped to max 20.0", fitted_t)
-        fitted_t = 20.0
-
-    nll_fitted = float(criterion(logits_64 / fitted_t, labels_64).item())
-
-    if nll_fitted < nll_t1:
-        logger.info(
-            "Temperature fitted: T=%.4f (NLL: %.4f -> %.4f, T=1.0 NLL=%.4f)",
-            fitted_t, nll_t1, nll_fitted, nll_t1
-        )
-        return fitted_t
-    else:
+    # 3. Clamp T to [0.25, 5.0] [ENG assumption] with loud warning
+    clamped = False
+    if raw_t < 0.25:
         logger.warning(
-            "Fitted temperature %.4f yielded higher or equal NLL (%.6f >= %.6f at T=1.0). "
-            "Falling back to T=1.0",
-            fitted_t, nll_fitted, nll_t1
+            "WARNING: Fitted temperature %.4f clamped to min 0.25 [ENG assumption]. "
+            "Extreme logits detected -- run scripts/diag_logits.py to inspect.",
+            raw_t
+        )
+        fitted_t = 0.25
+        clamped = True
+    elif raw_t > 5.0:
+        logger.warning(
+            "WARNING: Fitted temperature %.4f clamped to max 5.0 [ENG assumption]. "
+            "Extreme logits detected -- run scripts/diag_logits.py to inspect.",
+            raw_t
+        )
+        fitted_t = 5.0
+        clamped = True
+
+    # 4. Post-fit metrics
+    all_nll_post, all_ece_post = _eval_metrics(logits_64, labels_64, fitted_t)
+    trim_nll_post, trim_ece_post = _eval_metrics(fit_logits, fit_labels, fitted_t)
+
+    logger.info(
+        "Temperature Calibration: T=%.4f (raw=%.4f, clamped=%s) | "
+        "All samples (n=%d): pre NLL=%.4f ECE=%.4f -> post NLL=%.4f ECE=%.4f | "
+        "Trimmed (n=%d): pre NLL=%.4f ECE=%.4f -> post NLL=%.4f ECE=%.4f",
+        fitted_t, raw_t, clamped,
+        n_samples, all_nll_pre, all_ece_pre, all_nll_post, all_ece_post,
+        len(fit_labels), trim_nll_pre, trim_ece_pre, trim_nll_post, trim_ece_post
+    )
+
+    # 5. Guards
+    if all_ece_post > all_ece_pre:
+        logger.warning(
+            "WARNING: Post-fit ECE on all samples (%.4f) is higher than ECE at T=1.0 (%.4f). "
+            "Calibration worsened ECE. Falling back to T=1.0",
+            all_ece_post, all_ece_pre
         )
         return 1.0
+
+    if trim_nll_post >= trim_nll_pre:
+        logger.warning(
+            "WARNING: Post-fit trimmed NLL (%.4f) >= pre-fit trimmed NLL (%.4f). "
+            "Optimization failed to lower NLL. Falling back to T=1.0",
+            trim_nll_post, trim_nll_pre
+        )
+        return 1.0
+
+    return fitted_t
 

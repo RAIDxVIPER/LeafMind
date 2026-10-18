@@ -937,6 +937,31 @@ class TestBug6MetricsContent:
         assert "cls_2" in zs, "cls_2 should be zero_support but is not [Bug6]. Got: {}".format(zs)
         assert "cls_3" in zs, "cls_3 should be zero_support but is not [Bug6]. Got: {}".format(zs)
 
+    def test_macro_f1_supported_classes(self):
+        """macro_f1_supported_classes is computed only over classes with support > 0."""
+        from scripts.train_classifier import evaluate_split
+        from src.models.classifier import EfficientNetB3Classifier
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+
+        device = torch.device("cpu")
+        num_cls = 4
+        model = EfficientNetB3Classifier(num_classes=num_cls, pretrained=False).to(device)
+        idx_to_label = {i: "cls_{}".format(i) for i in range(num_cls)}
+
+        # Classes 0 and 1 have images, classes 2 and 3 have zero support
+        inputs  = torch.randn(20, 3, 224, 224)
+        targets = torch.tensor([0] * 10 + [1] * 10, dtype=torch.long)
+        loader  = DataLoader(TensorDataset(inputs, targets), batch_size=20)
+
+        result = evaluate_split(model, loader, device, idx_to_label, "test_split")
+        assert "macro_f1_supported_classes" in result
+        assert "macro_f1" in result
+        # Since classes 2 and 3 have support 0, their F1 is 0.0.
+        # macro_f1 = (f1_0 + f1_1) / 4, macro_f1_supported_classes = (f1_0 + f1_1) / 2.
+        # Thus macro_f1 == macro_f1_supported_classes * 0.5.
+        assert np.isclose(result["macro_f1"], result["macro_f1_supported_classes"] * 0.5)
+
 
 class TestBug7MaxTrainImagesRandomSample:
     """Bug7: --max-train-images must take a seeded random sample, not first-N."""
@@ -1139,20 +1164,166 @@ class TestFitTemperature:
         t_result = fit_temperature(base_logits, labels)
         assert t_result == 1.0, f"Expected fallback T=1.0 when optimizer yields worse NLL, got {t_result}"
 
-    def test_clamped_temperature_bounds(self, monkeypatch, synthetic_data):
-        """Fitted T is clamped to [0.05, 20.0]."""
+    def test_clamped_temperature_bounds(self, synthetic_data, caplog):
+        """Fitted T is clamped to [0.25, 5.0] [ENG assumption] with loud warning pointing to scripts/diag_logits.py."""
         from src.models.classifier import fit_temperature
-        import torch.optim as optim
         base_logits, labels = synthetic_data
 
-        class LowLBFGS:
+        # Scaled by 10.0 -> optimal T is ~10.0 -> clamped to 5.0
+        with caplog.at_level("WARNING"):
+            t_high = fit_temperature(base_logits * 10.0, labels)
+        assert t_high == 5.0, f"Expected upper clamp 5.0, got {t_high}"
+        assert "clamped to max 5.0" in caplog.text
+        assert "scripts/diag_logits.py" in caplog.text
+
+        caplog.clear()
+        # Scaled by 0.1 -> optimal T is ~0.1 -> clamped to 0.25
+        with caplog.at_level("WARNING"):
+            t_low = fit_temperature(base_logits * 0.1, labels)
+        assert t_low == 0.25, f"Expected lower clamp 0.25, got {t_low}"
+        assert "clamped to min 0.25" in caplog.text
+        assert "scripts/diag_logits.py" in caplog.text
+
+    def test_trimmed_fit_resists_one_percent_extreme_outliers(self, synthetic_data):
+        """Calibrated logits + 1% huge-logit wrong samples -> fitted T within 20% of true T (1.0).
+        Assert untrimmed NLL optimum on the same data is clearly higher."""
+        import torch.nn as nn
+        import torch.optim as optim
+        from src.models.classifier import fit_temperature
+
+        base_logits, labels = synthetic_data
+        n_samples = len(labels)
+        n_classes = base_logits.shape[1]
+
+        # 1% injected huge-logit wrong samples (30 samples out of 3000)
+        n_corrupt = int(0.01 * n_samples)
+        corrupted_logits = base_logits.clone()
+        corrupted_labels = labels.clone()
+        for i in range(n_corrupt):
+            wrong_class = (corrupted_labels[i].item() + 1) % n_classes
+            corrupted_logits[i, wrong_class] = 50.0
+
+        # Fitted T with trimming
+        t_fitted = fit_temperature(corrupted_logits, corrupted_labels)
+        true_t = 1.0
+        rel_diff = abs(t_fitted - true_t) / true_t
+        assert rel_diff <= 0.20, f"Expected fitted T within 20% of true T=1.0, got {t_fitted:.4f}"
+
+        # Untrimmed fit on the same data
+        log_t = nn.Parameter(torch.zeros(1, dtype=torch.float64))
+        opt = optim.LBFGS([log_t], lr=1.0, max_iter=50, line_search_fn="strong_wolfe")
+        crit = nn.CrossEntropyLoss()
+
+        def closure():
+            opt.zero_grad()
+            loss = crit(corrupted_logits / torch.exp(log_t), corrupted_labels)
+            loss.backward()
+            return loss
+
+        opt.step(closure)
+        untrimmed_t = float(torch.exp(log_t).item())
+
+        # Assert untrimmed NLL optimum is clearly higher (> 1.30 and > 20% higher than trimmed)
+        assert untrimmed_t > 1.30, f"Untrimmed T should be pulled far away (> 1.30), got {untrimmed_t:.4f}"
+        assert untrimmed_t > t_fitted * 1.20, (
+            f"Untrimmed T ({untrimmed_t:.4f}) should be significantly higher than trimmed T ({t_fitted:.4f})"
+        )
+
+    def test_ece_worsening_guard_returns_one(self, monkeypatch, synthetic_data, caplog):
+        """Guard test: if post-fit ECE is higher than ECE at T=1, return T=1.0 and warn."""
+        import math
+        import torch.optim as optim
+        from src.models.classifier import fit_temperature
+
+        base_logits, labels = synthetic_data
+
+        class BadECE_LBFGS:
             def __init__(self, params, *args, **kwargs):
                 self.params = list(params)
             def step(self, closure):
                 for p in self.params:
-                    p.data.fill_(-10.0)
+                    # Setting T = 4.0 on already calibrated data worsens ECE
+                    p.data.fill_(math.log(4.0))
 
-        monkeypatch.setattr(optim, "LBFGS", LowLBFGS)
-        t_low = fit_temperature(base_logits, labels)
-        assert t_low in [0.05, 1.0]
+        monkeypatch.setattr(optim, "LBFGS", BadECE_LBFGS)
+        with caplog.at_level("WARNING"):
+            t_res = fit_temperature(base_logits, labels)
+
+        assert t_res == 1.0, f"Expected guard fallback to T=1.0 when ECE worsens, got {t_res}"
+        assert "Calibration worsened ECE" in caplog.text
+
+
+class TestTrainClassifierEvalOnly:
+    """Test --eval-only flag in train_classifier.py."""
+
+    def test_eval_only_flag_runs_eval_and_writes_outputs(self, tmp_path, monkeypatch):
+        """--eval-only skips training, loads checkpoint, recalibrates, and writes metrics.json and CSVs."""
+        from src.models.classifier import EfficientNetB3Classifier
+        import scripts.train_classifier as tc
+        import json
+        import sys
+
+        ckpt_dir = tmp_path / "ckpt"
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save dummy model_best.pth
+        model = EfficientNetB3Classifier(num_classes=30, pretrained=False)
+        torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
+
+        cfg_path = tmp_path / "cfg.yaml"
+        with open(cfg_path, "w") as f:
+            f.write("""
+model:
+  pretrained: false
+dataloader:
+  num_workers: 0
+  pin_memory: false
+""")
+
+        monkeypatch.setattr(sys, "argv", [
+            "train_classifier.py",
+            "--eval-only",
+            "--config", str(cfg_path),
+            "--checkpoint-dir", str(ckpt_dir),
+            "--max-eval-images", "2",
+            "--batch-size", "2",
+        ])
+
+        tc.main()
+
+        metrics_file = ckpt_dir / "metrics.json"
+        assert metrics_file.exists(), "metrics.json must be written by --eval-only"
+        with open(metrics_file) as f:
+            metrics = json.load(f)
+
+        assert "temperature" in metrics
+        assert "calibration" in metrics
+        for split in ("val", "test_id", "test_ood_full", "test_ood_filt"):
+            assert split in metrics["splits"]
+            split_m = metrics["splits"][split]
+            assert "macro_f1_supported_classes" in split_m
+            assert "macro_f1" in split_m
+            assert (ckpt_dir / f"confusion_matrix_{split}.csv").exists()
+
+        assert (ckpt_dir / "temperature.json").exists()
+        assert not (ckpt_dir / "train_history.json").exists()
+
+    def test_eval_only_raises_when_no_checkpoint_found(self, tmp_path, monkeypatch):
+        """--eval-only raises FileNotFoundError when checkpoint is missing."""
+        import scripts.train_classifier as tc
+        import sys
+
+        empty_ckpt = tmp_path / "empty_ckpt"
+        empty_ckpt.mkdir(parents=True, exist_ok=True)
+
+        monkeypatch.setattr(sys, "argv", [
+            "train_classifier.py",
+            "--eval-only",
+            "--checkpoint-dir", str(empty_ckpt),
+            "--max-eval-images", "2",
+        ])
+
+        with pytest.raises(FileNotFoundError, match="neither model_best.pth nor model.pth found"):
+            tc.main()
+
 
