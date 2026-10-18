@@ -57,7 +57,7 @@ class VisionAgent:
         self.model_version = model_version
         logger.info("VisionAgent ready (version=%s)", model_version)
 
-    def predict(self, image_bytes: bytes) -> VisionOutput:
+    def predict(self, image_bytes: bytes, crop: Optional[str] = None) -> VisionOutput:
         """
         Run classification pipeline on raw image bytes.
 
@@ -65,16 +65,24 @@ class VisionAgent:
           1. Decode + RGB-convert [I9]
           2. Quality gate [ENG assumption thresholds]
           3. EfficientNet-B3 inference with temperature scaling [ENG]
-          4. OOD flag + escalation flag [ENG assumption]
-          5. Return VisionOutput (severity_pct=None always [R3])
+          4. If crop is given: mask logits to allowed classes, re-normalise via softmax,
+             compute confidence/OOD/escalation from masked distribution, top-3 candidates.
+          5. OOD flag + escalation flag [ENG assumption]
+          6. Return VisionOutput (severity_pct=None always [R3])
+
+        Args:
+            image_bytes: raw JPEG or PNG image bytes
+            crop: optional user-supplied crop name (e.g. "Corn", "Tomato", "Apple")
 
         Raises:
             RuntimeError: if the image cannot be decoded
+            ValueError: if an unknown crop name is provided
         """
-        output: VisionOutput = self.classifier.predict(image_bytes)
+        output: VisionOutput = self.classifier.predict(image_bytes, crop=crop)
         logger.debug(
-            "VisionAgent.predict: label=%s conf=%.3f ood=%s esc=%s",
-            output.top_label, output.confidence, output.ood_flag, output.escalate_to_human
+            "VisionAgent.predict: label=%s conf=%.3f crop=%s ood=%s esc=%s can_diag=%s",
+            output.top_label, output.confidence, output.crop,
+            output.ood_flag, output.escalate_to_human, output.can_diagnose,
         )
         return output
 

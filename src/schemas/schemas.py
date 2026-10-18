@@ -41,6 +41,19 @@ class ClassProb(BaseModel):
     label: str
     prob: float = Field(..., ge=0.0, le=1.0)
 
+    def __iter__(self):
+        """Allow tuple unpacking: (label, prob) = candidate."""
+        return iter((self.label, self.prob))
+
+    def __getitem__(self, item):
+        """Allow indexing: candidate[0] == label, candidate[1] == prob."""
+        return (self.label, self.prob)[item]
+
+    @property
+    def class_name(self) -> str:
+        return self.label
+
+
 class DetectedLeaf(BaseModel):
     class_id: int
     class_name: str
@@ -85,6 +98,40 @@ class VisionOutput(BaseModel):
     )
     model_version: str
     temperature: float = Field(..., description="Temperature scalar applied to logits")
+
+    # Crop-restricted diagnostic and prediction fields [C2 follow-up 2]
+    # [ENG decision] crop is user-supplied input, not predicted
+    crop: Optional[str] = Field(
+        default=None,
+        description="User-supplied crop name, if provided. [ENG decision: crop is user-supplied input, not predicted]"
+    )
+    top_3_candidates: Optional[List[ClassProb]] = Field(
+        default=None,
+        description="Top-3 candidate classes with probabilities from the crop-masked distribution"
+    )
+    single_class_crop: bool = Field(
+        default=False,
+        description="True if crop has only one class in taxonomy (cannot distinguish disease)"
+    )
+    can_diagnose: bool = Field(
+        default=True,
+        description="False if single_class_crop=True; model cannot provide a disease diagnosis"
+    )
+
+    @property
+    def crop_candidates(self) -> Optional[List[ClassProb]]:
+        """Alias for top_3_candidates."""
+        return self.top_3_candidates
+
+    @property
+    def top3_candidates(self) -> Optional[List[ClassProb]]:
+        """Alias for top_3_candidates."""
+        return self.top_3_candidates
+
+    @property
+    def candidates(self) -> Optional[List[ClassProb]]:
+        """Alias for top_3_candidates."""
+        return self.top_3_candidates
 
 
 # ── Weather Agent ──────────────────────────────────────────────────────────────

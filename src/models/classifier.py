@@ -246,6 +246,18 @@ class EfficientNetB3Classifier(nn.Module):
 
 # ── Full inference pipeline ───────────────────────────────────────────────────
 
+def extract_crop_from_label(label_name: str) -> str:
+    """
+    Extract the crop name from a class label string.
+    Format: '<Crop>___<Disease>'. Returns the text before '___'.
+    Special case: 'Corn_(maize)' and 'Corn' are treated as the same crop [ENG].
+    """
+    crop = label_name.split("___")[0].strip()
+    if crop.lower().startswith("corn"):
+        return "Corn"
+    return crop
+
+
 class LeafClassifier:
     """
     Full inference pipeline: bytes -> VisionOutput.
@@ -254,6 +266,7 @@ class LeafClassifier:
     Usage:
         clf = LeafClassifier.from_checkpoint("checkpoints/classifier")
         output: VisionOutput = clf.predict(image_bytes)
+        output_crop: VisionOutput = clf.predict(image_bytes, crop="Corn")
     """
 
     def __init__(
@@ -282,13 +295,64 @@ class LeafClassifier:
         self.blur_lap   = blur_lap       # [ENG assumption -- GAP L15]
         self.input_size = input_size
         self.top_k      = top_k
+
+        # Crop-to-indices mapping for crop-restricted prediction [ENG]
+        self.crop_to_indices: dict = {}
+        for idx, label in self.idx_to_label.items():
+            crop_name = extract_crop_from_label(label)
+            self.crop_to_indices.setdefault(crop_name, []).append(int(idx))
+
         self.model.eval()
         self.model.to(self.device)
 
-    def predict(self, image_bytes: bytes) -> VisionOutput:
+    def _resolve_crop(self, crop: str) -> str:
+        """
+        Validate and resolve a user-supplied crop string to a canonical crop name.
+        Handles aliases (Corn/Corn_(maize), Pepper/Pepper,_bell) and case-insensitivity.
+        Raises ValueError listing supported crops if unknown.
+        """
+        c = crop.strip()
+        if not c:
+            supported = ", ".join(sorted(self.crop_to_indices.keys()))
+            raise ValueError(f"Crop name cannot be empty. Supported crops: {supported}")
+
+        # Corn aliases (Corn, Corn_(maize), Corn (maize), maize) [ENG]
+        if c.lower() in ("corn", "corn_(maize)", "corn (maize)", "maize"):
+            if "Corn" in self.crop_to_indices:
+                return "Corn"
+
+        # Pepper aliases
+        if c.lower() in ("pepper", "pepper, bell", "pepper,_bell", "pepper_bell", "bell_pepper", "bell pepper"):
+            for k in self.crop_to_indices:
+                if k.lower().startswith("pepper"):
+                    return k
+
+        # Case-insensitive direct match against supported crops
+        for supported in self.crop_to_indices:
+            if c.lower() == supported.lower():
+                return supported
+
+        supported_list = ", ".join(sorted(self.crop_to_indices.keys()))
+        raise ValueError(f"Unknown crop '{crop}'. Supported crops: {supported_list}")
+
+    def predict(self, image_bytes: bytes, crop: Optional[str] = None) -> VisionOutput:
         """
         Run full inference pipeline on raw image bytes.
         Returns a VisionOutput that validates against the Pydantic schema [R6].
+
+        Args:
+            image_bytes: Raw JPEG/PNG/etc bytes.
+            crop: Optional user-supplied crop name (e.g. "Corn", "Tomato", "Apple").
+                  When supplied:
+                  - Logits are masked to classes of that crop (Corn and Corn_(maize) are one crop).
+                  - Probabilities are re-normalised by softmax over allowed classes.
+                  - confidence, ood_flag, escalation are computed from the masked distribution.
+                  - Top-3 candidates (class, probability) are returned in top_3_candidates.
+                  - If crop has only 1 class in taxonomy (Blueberry, Cherry, Peach, Raspberry,
+                    Soybean, Strawberry, Squash), single_class_crop=True and can_diagnose=False.
+                  - Unknown crop raises ValueError listing supported crops.
+                  When None:
+                  - Behaviour is exactly unchanged.
 
         severity_pct is ALWAYS None [R3/D2].
         D1 images are NEVER processed in training context [D14/R13].
@@ -306,31 +370,78 @@ class LeafClassifier:
         tensor = tensor.to(self.device)
         with torch.no_grad():
             cal_logits = self.model(tensor, calibrate=True)  # temperature-scaled
-            probs = torch.softmax(cal_logits, dim=1)[0]      # (num_classes,)
-
-        # Step 4: top-k predictions
-        top_probs, top_indices = torch.topk(probs, self.top_k)
-        top_k_probs: List[ClassProb] = [
-            ClassProb(label=self.idx_to_label[int(idx)], prob=float(prob))
-            for idx, prob in zip(top_indices.tolist(), top_probs.tolist())
-        ]
-
-        top_label   = top_k_probs[0].label
-        confidence  = top_k_probs[0].prob
-        top2_prob   = top_k_probs[1].prob if len(top_k_probs) > 1 else 0.0
-        gap         = confidence - top2_prob
 
         temperature = self.model.get_temperature()
 
-        # Step 5: OOD flag [ENG assumption -- calibrate on labelled OOD set -- L14]
-        ood_flag = confidence < self.ood_thresh  # [ENG assumption]
+        if crop is None:
+            # Step 4: top-k predictions (unmasked distribution -- v1 unchanged)
+            probs = torch.softmax(cal_logits, dim=1)[0]      # (num_classes,)
+            top_k = min(self.top_k, len(self.idx_to_label))
+            top_probs, top_indices = torch.topk(probs, top_k)
+            top_k_probs: List[ClassProb] = [
+                ClassProb(label=self.idx_to_label[int(idx)], prob=float(prob))
+                for idx, prob in zip(top_indices.tolist(), top_probs.tolist())
+            ]
 
-        # Step 6: escalation flag [ENG assumption -- calibrate on D2_Val]
-        escalate = (confidence < self.esc_conf) or (gap < self.esc_gap)  # [ENG assumption]
+            top_label   = top_k_probs[0].label
+            confidence  = top_k_probs[0].prob
+            top2_prob   = top_k_probs[1].prob if len(top_k_probs) > 1 else 0.0
+            gap         = confidence - top2_prob
+
+            # Step 5: OOD flag [ENG assumption -- calibrate on labelled OOD set -- L14]
+            ood_flag = confidence < self.ood_thresh  # [ENG assumption]
+
+            # Step 6: escalation flag [ENG assumption -- calibrate on D2_Val]
+            escalate = (confidence < self.esc_conf) or (gap < self.esc_gap)  # [ENG assumption]
+
+            top_3_candidates = None
+            single_class_crop = False
+            can_diagnose = True
+            output_crop = None
+        else:
+            # Step 4: crop-restricted masked distribution [ENG decision: crop is user-supplied input]
+            resolved_crop = self._resolve_crop(crop)
+            allowed_indices = self.crop_to_indices[resolved_crop]
+            num_allowed = len(allowed_indices)
+            single_class_crop = (num_allowed == 1)
+            can_diagnose = not single_class_crop
+
+            # Extract logits for allowed classes and re-normalise by softmax
+            allowed_logits = cal_logits[0, allowed_indices]  # (num_allowed,)
+            allowed_probs = torch.softmax(allowed_logits, dim=-1)  # re-normalised, sums to 1.0
+
+            # Sort allowed classes by probability descending
+            sort_perm = torch.argsort(allowed_probs, descending=True)
+            sorted_probs = allowed_probs[sort_perm].tolist()
+            sorted_indices = [allowed_indices[i] for i in sort_perm.tolist()]
+
+            # Top-3 candidates (class, probability) from the masked distribution
+            num_cand = min(3, num_allowed)
+            top_3_candidates: List[ClassProb] = [
+                ClassProb(label=self.idx_to_label[idx], prob=float(prob))
+                for idx, prob in zip(sorted_indices[:num_cand], sorted_probs[:num_cand])
+            ]
+
+            # top_k_probs for schema consistency (at most top_k or num_allowed)
+            top_k_count = min(self.top_k, num_allowed)
+            top_k_probs: List[ClassProb] = [
+                ClassProb(label=self.idx_to_label[idx], prob=float(prob))
+                for idx, prob in zip(sorted_indices[:top_k_count], sorted_probs[:top_k_count])
+            ]
+
+            top_label  = top_3_candidates[0].label
+            confidence = top_3_candidates[0].prob
+            top2_prob  = top_3_candidates[1].prob if len(top_3_candidates) > 1 else 0.0
+            gap        = confidence - top2_prob
+
+            # Step 5 & 6: OOD and escalation flags from masked distribution
+            ood_flag = confidence < self.ood_thresh
+            escalate = (confidence < self.esc_conf) or (gap < self.esc_gap)
+            output_crop = resolved_crop
 
         logger.info(
-            "Predict: top=%s conf=%.3f gap=%.3f T=%.3f ood=%s esc=%s",
-            top_label, confidence, gap, temperature, ood_flag, escalate
+            "Predict: top=%s conf=%.3f gap=%.3f T=%.3f crop=%s ood=%s esc=%s can_diag=%s",
+            top_label, confidence, gap, temperature, output_crop, ood_flag, escalate, can_diagnose
         )
 
         # Step 7: build VisionOutput -- severity_pct ALWAYS None [R3/D2]
@@ -347,6 +458,10 @@ class LeafClassifier:
             escalate_to_human=escalate,
             model_version=self.model_version,
             temperature=temperature,
+            crop=output_crop,
+            top_3_candidates=top_3_candidates,
+            single_class_crop=single_class_crop,
+            can_diagnose=can_diagnose,
         )
 
     @classmethod
