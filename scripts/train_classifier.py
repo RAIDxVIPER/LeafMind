@@ -186,11 +186,17 @@ def build_train_transform(cfg: dict) -> transforms.Compose:
     input_size = cfg.get("model", {}).get("input_size", 224)
     resize_to  = int(input_size * 256 / 224)
 
-    return transforms.Compose([
+    # v2 augmentation fields (default p=0.0 = disabled = v1 behaviour) [ENG]
+    perspective_p   = float(aug.get("random_perspective_p", 0.0))
+    random_erase_p  = float(aug.get("random_erasing_p", 0.0))
+
+    # Build transform list; RandomPerspective before ToTensor, RandomErasing after [ENG]
+    tfm_list = [
         # RandomResizedCrop first -- scale variation simulates field zoom [ENG]
         transforms.RandomResizedCrop(
             input_size,
             scale=(rrc.get("scale_min", 0.7), rrc.get("scale_max", 1.0)),
+            ratio=(rrc.get("ratio_min", 3 / 4), rrc.get("ratio_max", 4 / 3)),
         ),
         transforms.RandomHorizontalFlip(p=aug.get("horizontal_flip_p", 0.5)),   # [ENG]
         transforms.RandomVerticalFlip(p=aug.get("vertical_flip_p", 0.3)),       # [ENG]
@@ -209,12 +215,27 @@ def build_train_transform(cfg: dict) -> transforms.Compose:
             [transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))],
             p=aug.get("gaussian_blur_p", 0.2),
         ),  # [ENG] kernel_size=5 (odd, required); p applied per image
+    ]
+
+    # RandomPerspective: p=0.0 by default (v1 unchanged); v2 sets p=0.3 [ENG]
+    if perspective_p > 0.0:
+        tfm_list.append(
+            transforms.RandomPerspective(distortion_scale=0.5, p=perspective_p)
+        )
+
+    tfm_list += [
         transforms.ToTensor(),
         transforms.Normalize(
             mean=cfg.get("normalization", {}).get("mean", [0.485, 0.456, 0.406]),
             std=cfg.get("normalization", {}).get("std",  [0.229, 0.224, 0.225]),
         ),
-    ])
+    ]
+
+    # RandomErasing: applied after ToTensor (requires tensor) [ENG]; p=0.0 = v1 behaviour
+    if random_erase_p > 0.0:
+        tfm_list.append(transforms.RandomErasing(p=random_erase_p))
+
+    return transforms.Compose(tfm_list)
 
 
 def build_eval_transform(cfg: dict) -> transforms.Compose:
@@ -238,6 +259,125 @@ def build_eval_transform(cfg: dict) -> transforms.Compose:
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
 
+
+def _crop_from_label(label_name: str) -> str:
+    """
+    Extract the crop name from a class label string.
+    Format: '<Crop>___<Disease>'. Returns the text before '___'.
+    Special case: 'Corn_(maize)' and 'Corn' are treated as the same crop [ENG].
+    """
+    crop = label_name.split("___")[0].strip()
+    # Normalise: treat 'Corn_(maize)' as 'Corn' [ENG diagnostic]
+    if crop.lower().startswith("corn"):
+        crop = "Corn"
+    return crop
+
+
+def _compute_ood_diagnostics(
+    logits_all: np.ndarray,   # (N, num_classes) -- raw numpy, BEFORE softmax
+    preds: np.ndarray,
+    targets: np.ndarray,
+    confs: np.ndarray,
+    idx_to_label: dict,
+) -> dict:
+    """
+    Compute OOD robustness diagnostics for a single evaluation split.
+    All metrics are computed from actual predictions -- no numbers are fabricated [R1].
+
+    Metrics returned:
+      crop_restricted_top1       -- top-1 after masking logits to true crop classes
+      crop_restricted_macro_f1   -- macro-F1 after crop-restricted argmax
+      crop_top1                  -- fraction whose predicted class belongs to the true crop
+      healthy_vs_diseased_acc    -- binary accuracy: healthy vs diseased
+      diseased_predicted_healthy -- fraction of diseased images predicted as healthy
+      mean_confidence            -- mean of max softmax across all images
+      top5_predicted_classes     -- 5 most-predicted classes with share (fraction)
+
+    NOTE: crop_restricted_* metrics are [ENG diagnostic: valid only if the app
+    collects the crop from the user].
+    """
+    from sklearn.metrics import f1_score
+
+    num_cls = len(idx_to_label)
+    n = len(targets)
+
+    # ── Crop-to-class mapping ────────────────────────────────────────────────
+    # Build {crop_str: [class_idx, ...]} from idx_to_label
+    crop_to_indices: dict = {}
+    for idx, name in idx_to_label.items():
+        crop = _crop_from_label(name)
+        crop_to_indices.setdefault(crop, []).append(idx)
+
+    # ── crop_restricted argmax ───────────────────────────────────────────────
+    crop_restricted_preds = np.empty(n, dtype=np.int64)
+    for i in range(n):
+        true_crop = _crop_from_label(idx_to_label[int(targets[i])])
+        valid_indices = crop_to_indices.get(true_crop, list(range(num_cls)))
+        # Mask logits: set invalid class logits to -inf, then argmax
+        row_logits = logits_all[i].copy().astype(np.float64)
+        mask = np.full(num_cls, -np.inf)
+        mask[valid_indices] = row_logits[valid_indices]
+        crop_restricted_preds[i] = int(np.argmax(mask))
+
+    crop_restricted_top1 = float((crop_restricted_preds == targets).mean())
+    crop_restricted_macro_f1 = float(
+        f1_score(
+            targets, crop_restricted_preds,
+            average="macro", zero_division=0,
+            labels=list(range(num_cls)),
+        )
+    )
+
+    # ── crop_top1: fraction whose top-1 pred belongs to true crop ────────────
+    crop_correct = np.array([
+        _crop_from_label(idx_to_label[int(preds[i])]) ==
+        _crop_from_label(idx_to_label[int(targets[i])])
+        for i in range(n)
+    ], dtype=float)
+    crop_top1 = float(crop_correct.mean())
+
+    # ── healthy_vs_diseased_acc ──────────────────────────────────────────────
+    def _is_healthy(label_idx: int) -> bool:
+        return idx_to_label[int(label_idx)].endswith("___healthy")
+
+    true_healthy  = np.array([_is_healthy(t) for t in targets], dtype=bool)
+    pred_healthy  = np.array([_is_healthy(p) for p in preds],   dtype=bool)
+
+    hvd_acc = float((true_healthy == pred_healthy).mean())
+
+    # fraction of DISEASED images predicted as healthy
+    diseased_mask = ~true_healthy
+    if diseased_mask.sum() > 0:
+        diseased_pred_healthy = float(pred_healthy[diseased_mask].mean())
+    else:
+        diseased_pred_healthy = float("nan")
+
+    # ── mean confidence + top-5 most predicted classes ───────────────────────
+    mean_conf = float(confs.mean())
+
+    pred_counter = Counter(int(p) for p in preds)
+    top5 = pred_counter.most_common(5)
+    top5_classes = [
+        {"class": idx_to_label[cls_idx], "share": round(cnt / max(n, 1), 4)}
+        for cls_idx, cnt in top5
+    ]
+
+    return {
+        "crop_restricted_top1": round(crop_restricted_top1, 4),
+        "crop_restricted_macro_f1": round(crop_restricted_macro_f1, 4),
+        "crop_restricted_note": "[ENG diagnostic: valid only if the app collects the crop from the user]",
+        "crop_top1": round(crop_top1, 4),
+        "healthy_vs_diseased_acc": round(hvd_acc, 4),
+        "diseased_predicted_healthy": (
+            round(diseased_pred_healthy, 4)
+            if not (isinstance(diseased_pred_healthy, float) and np.isnan(diseased_pred_healthy))
+            else None
+        ),
+        "mean_confidence": round(mean_conf, 4),
+        "top5_predicted_classes": top5_classes,
+    }
+
+
 def evaluate_split(
     model: nn.Module,
     loader: DataLoader,
@@ -249,7 +389,7 @@ def evaluate_split(
     """
     Evaluate model on a single data split.
     Returns dict with macro_f1, per_class_f1/precision/recall/support, ece,
-    top1_acc, confusion_matrix, and raw arrays.
+    top1_acc, confusion_matrix, raw arrays, and OOD diagnostics.
 
     All returned numbers are computed from actual data [R1].
     No numbers are hardcoded or fabricated.
@@ -262,7 +402,7 @@ def evaluate_split(
     )
 
     model.eval()
-    all_preds, all_targets, all_confs = [], [], []
+    all_preds, all_targets, all_confs, all_logits = [], [], [], []
 
     with torch.no_grad():
         for inputs, targets in loader:
@@ -273,10 +413,12 @@ def evaluate_split(
             all_preds.extend(preds.cpu().numpy())
             all_targets.extend(targets.cpu().numpy())
             all_confs.extend(confs.cpu().numpy())
+            all_logits.append(logits.cpu().numpy())  # store for crop-restricted diagnostics
 
     preds   = np.array(all_preds)
     targets = np.array(all_targets)
     confs   = np.array(all_confs)
+    logits_all = np.concatenate(all_logits, axis=0)  # (N, num_classes)
     correct = (preds == targets).astype(float)
 
     n       = len(targets)
@@ -313,10 +455,32 @@ def evaluate_split(
 
     macro_f1_supported_classes = float(np.mean(supported_f1s)) if supported_f1s else 0.0
 
+    # ── OOD robustness diagnostics ────────────────────────────────────────────
+    diag = _compute_ood_diagnostics(logits_all, preds, targets, confs, idx_to_label)
+
     t_note = "" if temperature is None else " (T=%.4f fitted on D2_Val [ENG])" % temperature
     logger.info(
         "[%s] n=%d top1_acc=%.4f macro_F1=%.4f (supported_F1=%.4f) ECE=%.4f%s",
         split_name, n, top1_acc, macro_f1, macro_f1_supported_classes, ece, t_note
+    )
+    logger.info(
+        "[%s] OOD diagnostics: crop_restricted_top1=%.4f crop_restricted_macro_F1=%.4f "
+        "[ENG diagnostic: valid only if the app collects the crop from the user]",
+        split_name, diag["crop_restricted_top1"], diag["crop_restricted_macro_f1"],
+    )
+    logger.info(
+        "[%s] OOD diagnostics: crop_top1=%.4f hvd_acc=%.4f "
+        "diseased_pred_healthy=%s mean_conf=%.4f",
+        split_name, diag["crop_top1"], diag["healthy_vs_diseased_acc"],
+        diag["diseased_predicted_healthy"], diag["mean_confidence"],
+    )
+    logger.info(
+        "[%s] top-5 predicted classes: %s",
+        split_name,
+        ", ".join(
+            "{} ({:.1%})".format(e["class"], e["share"])
+            for e in diag["top5_predicted_classes"]
+        ),
     )
     if zero_support_classes:
         logger.warning(
@@ -335,6 +499,7 @@ def evaluate_split(
         "per_class_f1": f1_arr.tolist(),          # kept for backward compat
         "confusion_matrix": conf_mat.tolist(),
         "zero_support_classes": zero_support_classes,
+        "diagnostics": diag,
         "preds": preds,
         "targets": targets,
         "confs": confs,
@@ -573,11 +738,14 @@ def main():
     # Bug7: ALWAYS computed from the FULL training manifest before any dry-run subsampling.
     full_train_counts = Counter(label_to_idx[img["class"]] for img in train_images)
     class_weights = compute_class_weights(dict(full_train_counts), num_classes).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    # label_smoothing from config (default 0.0 = v1 behaviour [ENG])
+    label_smoothing = float(train_cfg.get("label_smoothing", 0.0))
+    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     logger.info(
         "Class weights: min=%.3f max=%.3f (computed from full train manifest [%d images] [ENG/Bug7])",
         class_weights.min().item(), class_weights.max().item(), len(train_images)
     )
+    logger.info("label_smoothing=%.2f [ENG; 0.0=v1 default, 0.1=v2]", label_smoothing)
 
     # Bug7: subset limits use seeded STRATIFIED random sample (not first-N slice)
     # Guarantees at least 1 image per class where available [Bug7].
@@ -845,10 +1013,11 @@ def main():
     )
 
     # ── Print summary ─────────────────────────────────────────────────────────
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("LEAFMIND C2 TRAINING SUMMARY")
-    print("=" * 60)
+    print("=" * 70)
     for split, r in results.items():
+        diag = r.get("diagnostics", {})
         if "ood" in split.lower():
             print(
                 "{:30s}  n={:5d}  top1={:.4f}  macro_F1={:.4f} (supported_F1={:.4f})  ECE={:.4f}".format(
@@ -861,6 +1030,28 @@ def main():
                     r["split"], r["n_images"], r["top1_accuracy"], r["macro_f1"], r["ece"]
                 )
             )
+        if diag:
+            print(
+                "  [diag] crop_restr_top1={:.4f}  crop_restr_mF1={:.4f}  "
+                "[ENG diagnostic: valid only if the app collects the crop from the user]".format(
+                    diag.get("crop_restricted_top1", float("nan")),
+                    diag.get("crop_restricted_macro_f1", float("nan")),
+                )
+            )
+            print(
+                "  [diag] crop_top1={:.4f}  hvd_acc={:.4f}  "
+                "diseased_pred_healthy={}  mean_conf={:.4f}".format(
+                    diag.get("crop_top1", float("nan")),
+                    diag.get("healthy_vs_diseased_acc", float("nan")),
+                    diag.get("diseased_predicted_healthy"),
+                    diag.get("mean_confidence", float("nan")),
+                )
+            )
+            top5_str = ", ".join(
+                "{} ({:.1%})".format(e["class"], e["share"])
+                for e in diag.get("top5_predicted_classes", [])
+            )
+            print("  [diag] top-5 predicted: {}".format(top5_str))
     print("OOD gap (primary):  {:.4f}".format(ood_gap))
     print("Temperature T:      {:.4f}  (fitted on D2_Val only [ENG])".format(temperature))
     print("Best epoch:         {}".format(best_epoch))
@@ -879,7 +1070,7 @@ def main():
         "PASS" if ood_f1 >= 0.50 else "FAIL/NOT MET", ood_f1))
     print("  Val ECE <= 0.05: {} ({:.4f})".format(
         "PASS" if results["val"]["ece"] <= 0.05 else "FAIL/NOT MET", results["val"]["ece"]))
-    print("=" * 60)
+    print("=" * 70)
 
     # ── Save metrics JSON ─────────────────────────────────────────────────────
     cal_stats = getattr(model, "_cal_stats", {})
@@ -919,6 +1110,7 @@ def main():
             "per_class_f1":               r["per_class_f1"],      # backward compat
             "confusion_matrix":           r["confusion_matrix"],
             "zero_support_classes":       r["zero_support_classes"],
+            "diagnostics":                r.get("diagnostics", {}),
         }
         # Bug6: save per-split confusion matrix as CSV
         csv_path = ckpt_dir / "confusion_matrix_{}.csv".format(split)
