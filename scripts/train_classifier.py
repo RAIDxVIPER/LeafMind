@@ -916,7 +916,19 @@ def main():
         logger.info("Final model saved to %s/model.pth", ckpt_dir)
     else:
         logger.info("--eval-only specified: skipping training phase.")
-        if (ckpt_dir / "config.json").exists():
+        # Attempt to read best epoch from train_history.json first if present
+        if (ckpt_dir / "train_history.json").exists():
+            try:
+                with open(ckpt_dir / "train_history.json") as f:
+                    th = json.load(f)
+                    if th and isinstance(th, list):
+                        best_entry = max(th, key=lambda x: x.get("val_macro_f1", -1.0))
+                        best_epoch = best_entry.get("epoch", best_epoch)
+                        best_val_f1 = best_entry.get("val_macro_f1", best_val_f1)
+            except Exception:
+                pass
+
+        if (best_epoch == -1 or best_epoch is None) and (ckpt_dir / "config.json").exists():
             try:
                 with open(ckpt_dir / "config.json") as f:
                     saved_cfg = json.load(f)
@@ -1054,7 +1066,8 @@ def main():
             print("  [diag] top-5 predicted: {}".format(top5_str))
     print("OOD gap (primary):  {:.4f}".format(ood_gap))
     print("Temperature T:      {:.4f}  (fitted on D2_Val only [ENG])".format(temperature))
-    print("Best epoch:         {}".format(best_epoch))
+    best_epoch_str = str(best_epoch) if (best_epoch is not None and best_epoch != -1) else "n/a"
+    print("Best epoch:         {}".format(best_epoch_str))
     # Bug8: explicit caveat that OOD ECE is fitted-on-val
     print("\nNOTE: T was fitted on D2_Val (lab-style images).")
     print("OOD ECE is expected to be higher due to domain shift. [ENG/DATA]")
@@ -1090,7 +1103,7 @@ def main():
                 if cal_stats.get("post_ece") is not None else None
             ),
         },
-        "best_epoch": best_epoch,
+        "best_epoch": best_epoch if (best_epoch is not None and best_epoch != -1) else "n/a",
         "splits": {},
         "ood_gap_primary": ood_gap,
         "tag": "[ALL NUMBERS COMPUTED from actual data -- R1]",

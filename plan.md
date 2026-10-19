@@ -71,7 +71,7 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 ## Implementation stages (only after Part 6 is approved)
 
 - [x] Data prep (C1) — 2026-10-10, all DoD items satisfied, 62/63 tests pass (1 skipped)
-- [~] Vision (C2) -- code + smoke test done; full GPU training pending
+- [x] Vision (C2) — 2026-10-18, model of record checkpoints/run1 (T=1.0, best epoch 11), ID F1=0.9934, Val F1=0.9947. OOD macro-F1 gate (0.2347 < 0.50) recorded as ACCEPTED KNOWN LIMITATION with I38-I40 left open and mitigations: D17 crop input, top-3 candidates, planned capture guide + image-quality gate. run2 is a negative result (no weights used). 203 pytest tests pass (1 skipped).
 - [ ] RAG (C3)
 - [ ] Weather (C4)
 - [ ] Risk (C5)
@@ -81,6 +81,26 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 - [ ] API / UI (C9)
 - [ ] Evaluation (C10)
 - [ ] Docker (C11)
+
+### Stage C2: Vision Model Close-out & Record of Decision
+- **Model of Record:** `checkpoints/run1` (EfficientNet-B3 v1, T=1.0, best epoch 11).
+- **Final Metrics (`checkpoints/run1/metrics.json`):**
+  - Validation (`val`, n=5,936): Top-1 0.9968 | Macro-F1 0.9947 | ECE 0.0020
+  - In-Distribution Test (`test_id`, n=5,923): Top-1 0.9961 | Macro-F1 0.9934 | ECE 0.0021
+  - Out-of-Distribution Full Test (`test_ood_full`, n=2,363): Top-1 0.2704 | Macro-F1 0.2347 | ECE 0.5058
+  - Out-of-Distribution Filtered Test (`test_ood_filt`, n=283, 7 classes): Top-1 0.3887 | Supported Macro-F1 0.3931 | ECE 0.3949
+  - Primary OOD Gap: 0.7637
+- **Run2 Evaluation (Negative Result — No weights used):**
+  - Architecture: EfficientNet-B3 v2 with stronger augmentations (scale_min 0.25, ColorJitter, RandomPerspective, RandomErasing) + label smoothing 0.1, best epoch 20 (inferred from save time), T=0.25 (clamped).
+  - Metrics: Test_ID F1 0.9948, but Test_OOD_full top1 0.2763 / macro-F1 0.2334 / ECE 0.6307 vs run1 0.2704 / 0.2347 / 0.5058.
+  - Reason: Augmentation did not move OOD generalization; label smoothing shifted logit distribution causing val-fitted temperature scaling to clamp at min 0.25 and severely worsen OOD calibration (ECE 0.6307 vs 0.5058). Run2 discarded; no run2 weights used.
+- **Accepted Known Limitation (OOD macro-F1 gate):**
+  - Test_OOD macro-F1 = 0.2347 < 0.50 quality gate target.
+  - Formally recorded as an **ACCEPTED KNOWN LIMITATION** due to severe lab (PlantVillage) to field (PlantDoc) domain shift.
+  - Issues I38–I40 left open with concrete mitigations:
+    1. D17 crop-constrained input masking: on multi-class crops (Apple, Corn, Grape, Pepper, Potato, Tomato; n=1,793), crop-restricted top-1 is 47.69% (top-3 is 81.99%, macro-F1 0.4416). Note: Single-class crops (Blueberry, Cherry, Peach, Raspberry, Soybean, Strawberry, Squash; n=570) are trivially 100% correct once the crop is known, inflating all-crop top-1 to 60.30% (top-3 86.33%), so single-class crops are excluded from the headline.
+    2. Top-3 disease candidate display rather than top-1 point prediction.
+    3. In-app capture guide + image-quality gate (blur, exposure, leaf presence check — planned).
 
 ## Open issues / blockers
 
@@ -123,10 +143,11 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | I35 | LOW | OOD ECE reported without explicit note that T was fitted on lab-style D2_Val | Resolved — caveat printed in summary, stored in metrics.json, and logged |
 | I36 | HIGH | calibrate_temperature in train_classifier.py diverged to T=14.13 (ECE 0.617) due to LBFGS(lr=0.1) on raw T without line search | Resolved — implemented robust fit_temperature in classifier.py: optimizes log_T with LBFGS(lr=1, strong_wolfe) on CPU float64; clamps T in [0.05, 20]; checks NLL < NLL(T=1) else falls back to 1.0; shared across train_classifier and calibrate.py; pre/post NLL and ECE recorded in metrics.json under "calibration" |
 | I37 | HIGH | Extreme eval-mode logits (e.g. from BatchNorm running-stat mismatch on field/OOD data) dominate mean NLL and push T to clamp | Resolved — fit_temperature excludes worst 1% samples (at least 1 if n>=100) from fitting set only; reports pre/post NLL and ECE on both all samples and trimmed set; clamps T to [0.25, 5.0] [ENG assumption] with loud warning pointing to scripts/diag_logits.py; guards with fallback to T=1.0 if post-fit ECE worsens; added macro_f1_supported_classes; added --eval-only to train_classifier.py |
-| I38 | CRITICAL | OOD macro-F1 0.235 vs 0.50 gate (top1 0.2704); domain shift from lab PlantVillage to in-the-wild PlantDoc breaks classification | Open — addressed via v2 config (stronger augmentations, RandomPerspective, RandomErasing, label smoothing 0.1); C2 kept [~] |
-| I39 | HIGH | OOD overconfidence (ECE 0.5058); lab-fitted temperature fails to calibrate on field images | Open — addressed via label smoothing 0.1 and augmentations in v2 config; C2 kept [~] |
-| I40 | HIGH | Diseased leaves predicted healthy on OOD data (18.1% false-healthy rate on full OOD, 12.2% on filtered); severe failure mode for farmer advisory | Open — diagnostic added; tracked in metrics.json; addressed via v2 config; C2 kept [~] |
+| I38 | CRITICAL | OOD macro-F1 0.235 vs 0.50 gate (top1 0.2704); domain shift from lab PlantVillage to in-the-wild PlantDoc breaks classification | Open (Accepted Known Limitation) — gate 0.2347 < 0.50 accepted as known limitation. run2 was a negative result (0.2334). Mitigations: D17 crop input masking (multi-class top-1 47.69% / top-3 81.99%; single-class crops trivially 100% correct and excluded from headline), top-3 candidates, planned capture guide + image-quality gate. |
+| I39 | HIGH | OOD overconfidence (ECE 0.5058); lab-fitted temperature fails to calibrate on field images | Open (Accepted Known Limitation) — lab-fitted T fails to calibrate field images. run2 label smoothing worsened ECE to 0.6307. Mitigations: D17 crop input (multi-class top-1 47.69% / top-3 81.99%; single-class crops excluded from headline), top-3 display, do not rely on confidence alone. |
+| I40 | HIGH | Diseased leaves predicted healthy on OOD data (18.1% false-healthy rate on full OOD, 12.2% on filtered); severe failure mode for farmer advisory | Open (Accepted Known Limitation) — 18.1% false-healthy rate on full OOD. run2 did not resolve domain shift. Mitigations: D17 crop input (multi-class top-1 47.69% / top-3 81.99%; single-class crops excluded from headline), top-3 display, planned capture guide + image-quality gate. |
 | I41 | MEDIUM | Crop is supplied by the user at submission time rather than predicted; single-class crops (Blueberry, Cherry, Peach, Raspberry, Soybean, Strawberry, Squash) cannot provide differential diagnosis | Resolved — implemented optional crop argument in LeafClassifier and VisionAgent with logit masking, softmax renormalisation, top_3_candidates, single_class_crop=True, can_diagnose=False; D17 recorded |
+| I42 | HIGH | ood_flag/escalate thresholds were tuned for 30-class output and need re-tuning for crop-masked output; do not rely on confidence alone | Open — thresholds tuned on unmasked 30-class distribution need re-tuning when crop masking reduces effective classes; do not rely on confidence alone; planned in C7/C10 |
 
 ## Decisions made
 
@@ -148,7 +169,8 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | D14 | Classifier trained exclusively on D2_Train; D1 images never in classifier pipeline | [DATA][ENG] | 2026-10-01 | I4, Part 2a-v |
 | D15 | Threat table uses GAP fallback (DISEASE_DETECTED=0.50) until pathologist fills it | [ENG][GAP] | 2026-10-01 | Part 4a-ii, I19 |
 | D16 | After applying config/exclusion_list.json, D2_Test_OOD has only 283 images covering 7 classes. Because the classifier is never trained on D1 (D14/R13), D1<->OOD overlap cannot leak into classifier evaluation. Primary OOD evaluation uses full deduped Test_OOD set. Exclusion-filtered set (283 images) is a secondary report only. Deviates from R7 as written. Exclusion filtering stays mandatory if any D1-trained model (e.g. YOLO) is evaluated on Test_OOD. | [ENG] | 2026-10-10 | I12 |
-| D17 | Crop is user-supplied input, not predicted. Logits are masked to classes of that crop; if single-class crop, can_diagnose is set False | [ENG] | 2026-10-18 | C2 follow-up 2, I41 |
+| D17 | Crop is user-supplied input, not predicted. Logits are masked to classes of that crop; if single-class crop, can_diagnose is set False. On multi-class crops (n=1,793), crop-restricted top-1 is 47.69% and top-3 is 81.99% (macro-F1 0.4416). Single-class crops are trivially 100% correct once the crop is known, inflating all-crop top-1 to 60.30%, so they are excluded from the headline. | [ENG] | 2026-10-18 | C2 follow-up 2, I41 |
+| D18 | C2 model of record = checkpoints/run1 (T=1.0, best epoch 11). run2 is a negative result; no run2 weights used. OOD macro-F1 gate (0.2347 < 0.50) accepted as known limitation with mitigations (D17 crop input, top-3 display, planned capture guide + image-quality gate). | [ENG] | 2026-10-18 | C2 close-out, I38-I40, I42 |
 
 ## Session Log
 
@@ -163,3 +185,4 @@ Legend: `[ ]` not started · `[~]` in progress / partial · `[x]` done · `[!]` 
 | 2026-10-18 | Session 8 (Robust calibration & eval-only) | Resolved I37: updated fit_temperature with 1% worst-sample trimming on fitting set only, clamp [0.25, 5.0] [ENG assumption] with warning pointing to scripts/diag_logits.py, ECE worsening guard fallback to T=1.0. Added macro_f1_supported_classes across splits in metrics.json and printed summary for OOD splits. Added --eval-only flag to train_classifier.py (skips training, loads checkpoint, recalibrates, evaluates all splits, writes metrics.json and CSVs). Added synthetic outlier regression tests, guard test, and eval-only tests. Pytest suite: 151 passed, 1 skipped (0 failed). C2 remains [~] pending full GPU run. | Kaggle/GPU training when user says 'continue' |
 | 2026-10-18 | Session 9 (C2 OOD diagnostics & v2 config) | Task 1: added OOD robustness diagnostics to evaluate_split & metrics.json (crop_restricted_top1/macro_f1 with [ENG diagnostic] label, crop_top1, healthy_vs_diseased_acc, diseased_pred_healthy fraction, mean_confidence, top-5 predicted classes with shares; ASCII logging). Added synthetic-logit tests in tests/unit/test_ood_diagnostics.py. Task 2: Re-evaluated run1 via --eval-only into checkpoints/run1_eval (run1 untouched): Test_ID top1=0.9961, F1=0.9934, ECE=0.0020; Test_OOD_full top1=0.2704, F1=0.2347, ECE=0.5058, crop_restricted_top1=0.6030, crop_top1=0.4939, hvd_acc=0.7905, diseased_pred_healthy=0.1808. Task 3: Created config/classifier_config_v2.yaml (scale_min 0.25, color_jitter 0.5/0.5/0.5/0.1, RandomPerspective p=0.3, gaussian_blur_p 0.3, RandomErasing p=0.25, label_smoothing 0.1; val/test transforms unchanged; v1 pipeline backward-compatible test verified; D14/R13 preserved). Logged I38, I39, I40. Full pytest: 177 passed, 1 skipped. C2 kept [~]. | Run run2 training with config_v2 on GPU when ready |
 | 2026-10-18 | Session 10 (C2 crop input support) | Implemented optional crop parameter in LeafClassifier.predict and VisionAgent.predict. When given: masks logits to crop classes (Corn and Corn_(maize) are one crop), re-normalises via softmax, computes confidence/OOD/escalation from masked distribution, returns top_3_candidates. Raises ValueError listing supported crops for unknown crops. Sets single_class_crop=True and can_diagnose=False for single-class crops (Blueberry, Cherry, Peach, Raspberry, Soybean, Strawberry, Squash). When crop is None, exact v1 behaviour is preserved. Added 25 CPU unit tests in tests/unit/test_crop_input.py. All 202 unit tests pass (1 skipped). Logged I41 and D17. Kept C2 as [~]. | Await completion of run2 GPU training |
+| 2026-10-18 | Session 11 (C2 close-out) | C2 closed out. Model of record = checkpoints/run1 (T=1.0, best epoch 11). Evaluated run2 as negative result: Test_ID F1 0.9948, but Test_OOD_full top1 0.2763 / macro-F1 0.2334 / ECE 0.6307 vs run1 0.2704 / 0.2347 / 0.5058; augmentation did not move OOD; label smoothing + val-fitted T clamped at 0.25. No run2 weights used. Recorded OOD macro-F1 gate (0.2347 < 0.50) as ACCEPTED KNOWN LIMITATION with I38-I40 left open and mitigations: D17 crop input (corrected to multi-class-only headline: top-1 47.69%, top-3 81.99%, macro-F1 0.4416 on n=1,793; single-class crops trivially 100% correct and excluded from headline), top-3 display, capture guide + image-quality gate (planned). Added issue I42 (ood_flag/escalate threshold re-tuning for crop-masked output; do not rely on confidence alone). Added D18. Cosmetic fixes: eval-only summary prints "Best epoch: -1" -> read from train_history.json if present, else print "n/a". Reworded clamp warning to "temperature clamped; inspect val logits (scripts/diag_logits.py)" without claiming extreme logits. Added tests (83 passed in test_classifier.py). Updated README roadmap ticking C1 and C2, listing C3-C11 as planned. Full pytest suite passed: 203 passed, 1 skipped (0 failed). C2 marked [x]. | C3 (RAG agent) when user says 'continue' |

@@ -1175,6 +1175,8 @@ class TestFitTemperature:
         assert t_high == 5.0, f"Expected upper clamp 5.0, got {t_high}"
         assert "clamped to max 5.0" in caplog.text
         assert "scripts/diag_logits.py" in caplog.text
+        assert "temperature clamped; inspect val logits (scripts/diag_logits.py)" in caplog.text
+        assert "Extreme logits" not in caplog.text
 
         caplog.clear()
         # Scaled by 0.1 -> optimal T is ~0.1 -> clamped to 0.25
@@ -1183,6 +1185,8 @@ class TestFitTemperature:
         assert t_low == 0.25, f"Expected lower clamp 0.25, got {t_low}"
         assert "clamped to min 0.25" in caplog.text
         assert "scripts/diag_logits.py" in caplog.text
+        assert "temperature clamped; inspect val logits (scripts/diag_logits.py)" in caplog.text
+        assert "Extreme logits" not in caplog.text
 
     def test_trimmed_fit_resists_one_percent_extreme_outliers(self, synthetic_data):
         """Calibrated logits + 1% huge-logit wrong samples -> fitted T within 20% of true T (1.0).
@@ -1256,7 +1260,7 @@ class TestFitTemperature:
 class TestTrainClassifierEvalOnly:
     """Test --eval-only flag in train_classifier.py."""
 
-    def test_eval_only_flag_runs_eval_and_writes_outputs(self, tmp_path, monkeypatch):
+    def test_eval_only_flag_runs_eval_and_writes_outputs(self, tmp_path, monkeypatch, capsys):
         """--eval-only skips training, loads checkpoint, recalibrates, and writes metrics.json and CSVs."""
         from src.models.classifier import EfficientNetB3Classifier
         import scripts.train_classifier as tc
@@ -1291,11 +1295,16 @@ dataloader:
 
         tc.main()
 
+        out = capsys.readouterr().out
+        assert "Best epoch:         n/a" in out
+        assert "Best epoch:         -1" not in out
+
         metrics_file = ckpt_dir / "metrics.json"
         assert metrics_file.exists(), "metrics.json must be written by --eval-only"
         with open(metrics_file) as f:
             metrics = json.load(f)
 
+        assert metrics["best_epoch"] == "n/a"
         assert "temperature" in metrics
         assert "calibration" in metrics
         for split in ("val", "test_id", "test_ood_full", "test_ood_filt"):
@@ -1307,6 +1316,58 @@ dataloader:
 
         assert (ckpt_dir / "temperature.json").exists()
         assert not (ckpt_dir / "train_history.json").exists()
+
+    def test_eval_only_reads_best_epoch_from_train_history(self, tmp_path, monkeypatch, capsys):
+        """--eval-only reads best epoch from train_history.json when present and writes to metrics."""
+        from src.models.classifier import EfficientNetB3Classifier
+        import scripts.train_classifier as tc
+        import json
+        import sys
+
+        ckpt_dir = tmp_path / "ckpt_with_history"
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+        model = EfficientNetB3Classifier(num_classes=30, pretrained=False)
+        torch.save(model.state_dict(), ckpt_dir / "model_best.pth")
+
+        # Create train_history.json with peak val_macro_f1 at epoch 11
+        history = [
+            {"epoch": 1, "loss": 0.9, "val_macro_f1": 0.85},
+            {"epoch": 11, "loss": 0.05, "val_macro_f1": 0.994},
+            {"epoch": 12, "loss": 0.06, "val_macro_f1": 0.991},
+        ]
+        with open(ckpt_dir / "train_history.json", "w") as f:
+            json.dump(history, f)
+
+        cfg_path = tmp_path / "cfg.yaml"
+        with open(cfg_path, "w") as f:
+            f.write("""
+model:
+  pretrained: false
+dataloader:
+  num_workers: 0
+  pin_memory: false
+""")
+
+        monkeypatch.setattr(sys, "argv", [
+            "train_classifier.py",
+            "--eval-only",
+            "--config", str(cfg_path),
+            "--checkpoint-dir", str(ckpt_dir),
+            "--max-eval-images", "2",
+            "--batch-size", "2",
+        ])
+
+        tc.main()
+
+        out = capsys.readouterr().out
+        assert "Best epoch:         11" in out
+
+        metrics_file = ckpt_dir / "metrics.json"
+        assert metrics_file.exists()
+        with open(metrics_file) as f:
+            metrics = json.load(f)
+        assert metrics["best_epoch"] == 11
 
     def test_eval_only_raises_when_no_checkpoint_found(self, tmp_path, monkeypatch):
         """--eval-only raises FileNotFoundError when checkpoint is missing."""

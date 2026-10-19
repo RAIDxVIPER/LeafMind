@@ -626,8 +626,8 @@ def fit_temperature(
        from the fitting set only. Logs how many were dropped and their NLL statistics.
     2. Optimises log_T (T = exp(log_T)) with LBFGS(lr=1.0, max_iter=max_iter,
        line_search_fn="strong_wolfe") on CPU float64 logits of the trimmed set.
-    3. Clamps fitted T to [0.25, 5.0] [ENG assumption] and logs a loud warning pointing
-       to scripts/diag_logits.py when clamped.
+    3. Clamps fitted T to [0.25, 5.0] [ENG assumption] and logs a warning:
+       "temperature clamped; inspect val logits (scripts/diag_logits.py)".
     4. Computes pre/post NLL and ECE on both all samples and trimmed samples, and logs them.
     5. Guards:
        - If post-fit ECE (on all samples) is higher than ECE at T=1.0, returns 1.0 and warns.
@@ -717,16 +717,16 @@ def fit_temperature(
     clamped = False
     if raw_t < 0.25:
         logger.warning(
-            "WARNING: Fitted temperature %.4f clamped to min 0.25 [ENG assumption]. "
-            "Extreme logits detected -- run scripts/diag_logits.py to inspect.",
+            "WARNING: Fitted temperature %.4f clamped to min 0.25 [ENG assumption]; "
+            "temperature clamped; inspect val logits (scripts/diag_logits.py)",
             raw_t
         )
         fitted_t = 0.25
         clamped = True
     elif raw_t > 5.0:
         logger.warning(
-            "WARNING: Fitted temperature %.4f clamped to max 5.0 [ENG assumption]. "
-            "Extreme logits detected -- run scripts/diag_logits.py to inspect.",
+            "WARNING: Fitted temperature %.4f clamped to max 5.0 [ENG assumption]; "
+            "temperature clamped; inspect val logits (scripts/diag_logits.py)",
             raw_t
         )
         fitted_t = 5.0

@@ -174,7 +174,17 @@ VECTOR_DB_PATH=vector_db/
 - [x] **Part 4:** Decision & risk synthesis logic, escalation triggers (T1–T11), and monitoring rules.
 - [x] **Part 5:** Evaluation protocols, deployment stack, and modular directory design.
 - [x] **Part 6:** Research validity review, constraint registers, and final implementation blueprint.
-- [ ] **Implementation (C1–C11):** Data prep, model training, agent construction, UI, and Docker containerization.
+- [x] **C1 — Data Prep:** Manifest generation, perceptual deduplication, split leakage audit, class maps, and threat tier definitions.
+- [x] **C2 — Vision Model:** EfficientNet-B3 classifier training, temperature calibration (model of record: `checkpoints/run1`), crop-masked inference, and OOD diagnostics.
+- [ ] **C3 — RAG Agent:** Agricultural extension vector store, semantic retrieval, and citation grounding (Planned).
+- [ ] **C4 — Weather Agent:** Micro-climate meteorological fetching (Open-Meteo), cache, and risk factor extraction (Planned).
+- [ ] **C5 — Risk & Reasoning Agent:** Pathogen threat tiering, meteorological favorability, and composite scoring (Planned).
+- [ ] **C6 — Recommendation Agent:** Plain-language treatment advisory, chemical/cultural guidance, and safety intervals (Planned).
+- [ ] **C7 — Orchestrator Agent:** LangGraph state machine, case lifecycle, SQLite persistence, and parallel agent dispatch (Planned).
+- [ ] **C8 — Monitoring Agent:** Longitudinal follow-up comparison, symptom progression tracking, and escalation alerts (Planned).
+- [ ] **C9 — API & UI:** FastAPI backend and Streamlit farmer/agronomist dashboard (Planned).
+- [ ] **C10 — Evaluation Suite:** End-to-end evaluation, benchmark reporting, and reliability tests (Planned).
+- [ ] **C11 — Containerization & Deployment:** Docker multi-container environment and deployment hardening (Planned).
 
 ---
 
