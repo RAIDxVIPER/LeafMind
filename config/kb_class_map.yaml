@@ -1,0 +1,273 @@
+# LeafMind Knowledge Base to Model Class Mapping
+# Maps disease chapters in data/knowledge_base/*.pdf to model classes in config/class_map_d2.json
+# Follows C2 crop alias logic: Corn == Corn_(maize) == maize, Pepper,_bell == Pepper
+
+version: "1.0"
+description: "Mapping between KB disease chapters and D2 model classes"
+
+# Crops and their disease chapters
+crops:
+  Apple:
+    aliases:
+      - "apple"
+    diseases:
+      "Apple Scab":
+        model_class: "Apple___Apple_scab"
+        aliases: ["apple scab", "scab"]
+      "Cedar Apple Rust":
+        model_class: "Apple___Cedar_apple_rust"
+        aliases: ["cedar apple rust", "cedar rust"]
+      "Marssonina Leaf Blotch (Premature Leaf Fall)":
+        model_class: null
+        aliases: ["marssonina leaf blotch", "premature leaf fall"]
+      "Powdery Mildew":
+        model_class: null
+        aliases: ["apple powdery mildew"]
+      "Collar Rot":
+        model_class: null
+      "White Root Rot":
+        model_class: null
+      "Alternaria Leaf Blotch":
+        model_class: null
+      "Sooty Blotch and Flyspeck":
+        model_class: null
+      "Fire Blight":
+        model_class: null
+
+  Blueberry:
+    aliases:
+      - "blueberry"
+    diseases:
+      "Phytophthora Root Rot":
+        model_class: null
+      "Botrytis Blight (Gray Mould)":
+        model_class: null
+      "Anthracnose and Ripe Rot (Fruit Rots)":
+        model_class: null
+      "Phomopsis Twig Blight and Botryosphaeria Stem Blight / Canker":
+        model_class: null
+        aliases: ["phomopsis twig blight", "stem blight", "canker"]
+      "Mummy Berry":
+        model_class: null
+      "Leaf and Fruit Spots (Septoria, Exobasidium, Rust)":
+        model_class: null
+      "Bacterial Leaf Scorch":
+        model_class: null
+
+  Cherry:
+    aliases:
+      - "cherry"
+    diseases:
+      "Brown Rot":
+        model_class: null
+      "Bacterial Canker (Gummosis)":
+        model_class: null
+      "Cherry Leaf Spot (Shot Hole)":
+        model_class: null
+        aliases: ["shot hole", "cherry leaf spot"]
+      "Powdery Mildew":
+        model_class: null
+      "Crown Gall":
+        model_class: null
+      "Collar Rot / Root and Crown Rot (Phytophthora)":
+        model_class: null
+
+  Corn:
+    aliases:
+      - "corn"
+      - "corn_(maize)"
+      - "corn (maize)"
+      - "maize"
+    diseases:
+      "Turcicum Leaf Blight (Northern Corn Leaf Blight)":
+        model_class: "Corn___Northern_Leaf_Blight"
+        aliases:
+          - "turcicum leaf blight"
+          - "northern corn leaf blight"
+          - "northern leaf blight"
+          - "corn northern leaf blight"
+      "Common Rust":
+        model_class: "Corn___Common_rust"
+        aliases:
+          - "common rust"
+          - "corn common rust"
+      "Gray Leaf Spot":
+        model_class: "Corn___Cercospora_leaf_spot"
+        aliases:
+          - "gray leaf spot"
+          - "grey leaf spot"
+          - "corn cercospora leaf spot"
+          - "cercospora leaf spot"
+      "Maydis Leaf Blight (Southern Corn Leaf Blight)":
+        model_class: null
+      "Banded Leaf and Sheath Blight":
+        model_class: null
+      "Polysora (Southern) Rust":
+        model_class: null
+      "Downy Mildew (Sorghum Downy Mildew, with Rajasthan and Brown Stripe types)":
+        model_class: null
+        aliases: ["downy mildew", "sorghum downy mildew"]
+      "Charcoal Rot (Post-Flowering Stalk Rot)":
+        model_class: null
+      "Fusarium Stalk Rot (Post-Flowering Stalk Rot)":
+        model_class: null
+      "Bacterial Stalk Rot":
+        model_class: null
+      "Curvularia Leaf Spot":
+        model_class: null
+      "Brown Spot":
+        model_class: null
+      "Zonate Leaf Spot":
+        model_class: null
+      "Pythium Stalk Rot":
+        model_class: null
+      "Late Wilt":
+        model_class: null
+      "Ear Rots and Mycotoxin Risk (Fusarium, Gibberella, Aspergillus, Diplodia, Penicillium)":
+        model_class: null
+        aliases: ["ear rots", "ear rot"]
+      "Common Smut and Head Smut":
+        model_class: null
+        aliases: ["common smut", "head smut"]
+      "Seed Rot, Seedling Blight and Root Rot":
+        model_class: null
+
+  Grape:
+    aliases:
+      - "grape"
+      - "grapes"
+    diseases:
+      "Black Rot":
+        model_class: "Grape___Black_rot"
+        aliases: ["black rot", "grape black rot"]
+      "Esca (Black Measles)":
+        model_class: "Grape___Esca_(Black_Measles)"
+        aliases: ["esca", "black measles", "esca (black measles)"]
+      "Downy Mildew":
+        model_class: null
+      "Powdery Mildew":
+        model_class: null
+      "Anthracnose (Bird's-eye Rot)":
+        model_class: null
+        aliases: ["anthracnose", "bird's-eye rot"]
+      "Bacterial Leaf Spot":
+        model_class: null
+      "Alternaria Leaf Blight and Bunch Necrosis":
+        model_class: null
+      "Post-harvest Berry Rots (Botrytis, Aspergillus, Rhizopus and others)":
+        model_class: null
+        aliases: ["post-harvest berry rots", "berry rots"]
+      "Leaf Rust":
+        model_class: null
+      "Bitter Rot":
+        model_class: null
+      "Dead Arm (Phomopsis Cane and Leaf Spot)":
+        model_class: null
+        aliases: ["dead arm", "phomopsis cane and leaf spot"]
+
+  Tomato:
+    aliases:
+      - "tomato"
+    diseases:
+      "Early Blight":
+        model_class: "Tomato___Early_blight"
+        aliases: ["early blight", "tomato early blight"]
+      "Late Blight":
+        model_class: "Tomato___Late_blight"
+        aliases: ["late blight", "tomato late blight"]
+      "Septoria Leaf Spot":
+        model_class: "Tomato___Septoria_leaf_spot"
+        aliases: ["septoria leaf spot", "septoria"]
+      "Tomato Leaf Curl Disease":
+        model_class: "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+        aliases:
+          - "tomato leaf curl disease"
+          - "tomato yellow leaf curl virus"
+          - "leaf curl"
+          - "tylcv"
+      "Bacterial Leaf Spot (Bacterial Spot)":
+        model_class: "Tomato___Bacterial_spot"
+        aliases:
+          - "bacterial leaf spot"
+          - "bacterial spot"
+          - "bacterial leaf spot (bacterial spot)"
+      "Leaf Mould":
+        model_class: "Tomato___Leaf_Mold"
+        aliases:
+          - "leaf mould"
+          - "leaf mold"
+          - "tomato leaf mold"
+      "Tomato Mosaic Virus (and related mosaic viruses)":
+        model_class: "Tomato___Tomato_mosaic_virus"
+        aliases:
+          - "tomato mosaic virus"
+          - "tomato mosaic virus (and related mosaic viruses)"
+          - "mosaic virus"
+          - "tomv"
+      "Damping Off":
+        model_class: null
+      "Fusarium Wilt":
+        model_class: null
+      "Bacterial Wilt":
+        model_class: null
+      "Bacterial Stem and Fruit Canker":
+        model_class: null
+        aliases: ["bacterial canker", "fruit canker"]
+      "Tomato Spotted Wilt / Bud Necrosis":
+        model_class: null
+        aliases: ["tomato spotted wilt", "bud necrosis", "tswv"]
+
+  # Future crops (ready for pipeline pickup when PDFs are added)
+  Potato:
+    aliases:
+      - "potato"
+    diseases:
+      "Early Blight":
+        model_class: "Potato___Early_blight"
+        aliases: ["potato early blight", "early blight"]
+      "Late Blight":
+        model_class: "Potato___Late_blight"
+        aliases: ["potato late blight", "late blight"]
+
+  Pepper,_bell:
+    aliases:
+      - "pepper"
+      - "pepper,_bell"
+      - "pepper, bell"
+      - "pepper_bell"
+      - "bell_pepper"
+      - "bell pepper"
+    diseases:
+      "Bacterial Spot":
+        model_class: "Pepper,_bell___Bacterial_spot"
+        aliases: ["bacterial spot", "bacterial leaf spot", "pepper bacterial spot"]
+
+  Squash:
+    aliases:
+      - "squash"
+    diseases:
+      "Powdery Mildew":
+        model_class: "Squash___Powdery_mildew"
+        aliases: ["squash powdery mildew", "powdery mildew"]
+
+# Known model classes without current KB chapter (expected gaps)
+model_classes_without_kb:
+  - "Pepper,_bell___Bacterial_spot"
+  - "Potato___Early_blight"
+  - "Potato___Late_blight"
+  - "Squash___Powdery_mildew"
+
+# Healthy classes (no KB disease chapter required; return found=False, reason="healthy_class")
+healthy_classes:
+  - "Apple___healthy"
+  - "Blueberry___healthy"
+  - "Cherry___healthy"
+  - "Corn_(maize)___healthy"
+  - "Grape___healthy"
+  - "Peach___healthy"
+  - "Pepper,_bell___healthy"
+  - "Potato___healthy"
+  - "Raspberry___healthy"
+  - "Soybean___healthy"
+  - "Strawberry___healthy"
+  - "Tomato___healthy"

@@ -8,7 +8,7 @@ Copied verbatim — do NOT modify field names or types without updating the spec
 """
 from __future__ import annotations
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel, Field, field_validator
 import uuid
 
@@ -179,19 +179,62 @@ class WeatherOutput(BaseModel):
 
 # ── RAG Agent ──────────────────────────────────────────────────────────────────
 
+class ChemicalOption(BaseModel):
+    product: str
+    verification_tag: str = Field(..., description="Verification tag (V1, V2, V3, US, or --)")
+    dose: Optional[str] = Field(None, description="Formulation dose")
+    water: Optional[str] = Field(None, description="Water volume")
+    target: Optional[str] = Field(None, description="Target disease or crop stage")
+    basis_phi: Optional[str] = Field(None, description="Regulatory basis, pre-harvest interval, or source note")
+
+
+class Citation(BaseModel):
+    tag: str = Field(..., description="Citation tag, e.g. T8, IH26, RED")
+    title: str = Field(..., description="Source title or bibliographical description")
+    url: Optional[str] = Field(None, description="Source URL if available")
+
+
 class RAGInput(BaseModel):
     disease_label: str          # e.g. "Tomato___Early_blight"
     top_k_probs: List[ClassProb]  # Passed for context
 
+
 class RAGOutput(BaseModel):
     """
-    Output of the RAG Agent.
-    When rag_available=False or knowledge_gap_flag=True, all treatment fields are empty/null
-    and the Recommendation Agent must produce a "consult agronomist" response.
-    cost_estimate_note is null until RAG documents containing cost data are collected.
+    Output of the RAG Agent (per disease candidate or query).
+    Extractive assembly only — no LLM generation.
+    When found=False or kb_gap=True, treatment fields remain empty.
+    Chemical doses are returned only when include_doses=True.
     """
-    rag_available: bool
-    knowledge_gap_flag: bool = False
+    # Core candidate fields (Stage C3)
+    crop: Optional[str] = Field(None, description="Crop name (e.g. Tomato, Apple, Corn)")
+    model_class: Optional[str] = Field(None, description="Model class string from class_map_d2.json")
+    disease_name: Optional[str] = Field(None, description="Human-readable disease name from KB chapter")
+    found: bool = Field(False, description="True if disease chapter was found and extracted from KB")
+    kb_gap: bool = Field(False, description="True if model class has no KB chapter (e.g. Potato/Pepper until added)")
+    reason: Optional[str] = Field(None, description="Explanation when not found (e.g. 'healthy_class', 'no_kb_chapter')")
+    what_it_is: Optional[str] = Field(None, description="Disease identification and symptoms from Chapter Sec 1 / At a glance")
+    why_it_happens: Optional[str] = Field(None, description="Causal pathogen, spread and progression from Chapter Sec 2")
+    what_to_do_first: Optional[str] = Field(None, description="Immediate cultural/sanitation/preventive action from Chapter Sec 4")
+    favourable_conditions: Optional[str] = Field(None, description="Weather/environmental drivers from Chapter Sec 3 (feeds C5 risk agent)")
+    look_alikes: Optional[str] = Field(None, description="Look-alikes and differential diagnosis from Chapter Sec 1")
+    prevention: Optional[str] = Field(None, description="Full prevention and cultural management measures from Chapter Sec 4")
+    chemical_options: List[ChemicalOption] = Field(
+        default_factory=list,
+        description="Verified chemical options with verification tags (empty unless include_doses=True)"
+    )
+    caveats: List[str] = Field(
+        default_factory=list,
+        description="Statutory caveats (confirm current label, CIB&RC compilation dates)"
+    )
+    citations: List[Union[Citation, str]] = Field(
+        default_factory=list,
+        description="Source citations with tags and URLs from Chapter Sec 6"
+    )
+
+    # Backward-compatible fields from spec v1.0
+    rag_available: bool = Field(True, description="True if RAG lookup succeeded without system error")
+    knowledge_gap_flag: bool = Field(False, description="Legacy alias for kb_gap")
     synthesis_failed: bool = False
     treatment_options: List[str] = Field(default_factory=list)
     active_ingredients: List[str] = Field(default_factory=list)
@@ -201,8 +244,6 @@ class RAGOutput(BaseModel):
         None,
         description="Always null until RAG knowledge base contains cost data [GAP]"
     )
-    citations: List[str] = Field(default_factory=list,
-                                 description="source_document values from chunk metadata")
     retrieval_confidence: Optional[float] = Field(
         None, ge=0.0, le=1.0,
         description="Mean cross-encoder reranker score of top-3 chunks"
@@ -211,7 +252,6 @@ class RAGOutput(BaseModel):
         None,
         description="Set when synthesis_failed=True; raw retrieved text as fallback"
     )
-
 
 # ── Risk/Reason Agent ──────────────────────────────────────────────────────────
 

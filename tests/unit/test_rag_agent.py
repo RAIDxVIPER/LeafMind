@@ -1,0 +1,167 @@
+"""
+tests/unit/test_rag_agent.py
+============================
+Unit tests for RAG Agent advisory generation and extractive assembly (Stage C3).
+Verifies:
+  1. Chemical doses hidden by default (include_doses=False -> chemical_options=[]).
+  2. Chemical doses present with include_doses=True and properly tagged (V1/V2/V3/US/--).
+  3. Citations non-empty for every found disease result.
+  4. what_to_do_first comes from Prevention and management, is extractive and short.
+  5. process_vision_output correctly processes VisionOutput top-3 candidates.
+  6. Index rebuild is deterministic (same chunk count twice).
+"""
+from __future__ import annotations
+
+import pytest
+
+from src.rag.agent import RAGAgent
+from src.rag.index import KBIndex
+from src.rag.ingest import ingest_knowledge_base
+from src.schemas.schemas import ClassProb, ImageQualityFlags, VisionOutput
+
+
+@pytest.fixture(scope="module")
+def agent():
+    index = KBIndex()
+    index.load()
+    return RAGAgent()
+
+
+class TestRAGAgent:
+
+    def test_doses_hidden_by_default(self, agent):
+        """Doses hidden by default, empty unless include_doses=True."""
+        ro = agent.query_candidate("Tomato___Late_blight", crop="Tomato", include_doses=False)
+        assert ro.found is True
+        assert ro.chemical_options == [], "chemical_options MUST be empty when include_doses=False"
+
+    def test_doses_present_with_include_doses_true(self, agent):
+        """Chemical doses are returned only when include_doses=True and carry verification tags."""
+        ro = agent.query_candidate("Tomato___Late_blight", crop="Tomato", include_doses=True)
+        assert ro.found is True
+        assert len(ro.chemical_options) > 0, "chemical_options must not be empty when include_doses=True"
+        for opt in ro.chemical_options:
+            assert opt.verification_tag in ("V1", "V2", "V3", "US", "--")
+            assert len(opt.product) > 0
+
+    def test_citations_non_empty_for_every_found_result(self, agent):
+        """Citations non-empty for every found result across all 14 mapped classes."""
+        mapped_classes = [
+            ("Apple___Apple_scab", "Apple"),
+            ("Apple___Cedar_apple_rust", "Apple"),
+            ("Grape___Black_rot", "Grape"),
+            ("Grape___Esca_(Black_Measles)", "Grape"),
+            ("Corn___Northern_Leaf_Blight", "Corn"),
+            ("Corn___Common_rust", "Corn"),
+            ("Corn___Cercospora_leaf_spot", "Corn"),
+            ("Tomato___Early_blight", "Tomato"),
+            ("Tomato___Late_blight", "Tomato"),
+            ("Tomato___Septoria_leaf_spot", "Tomato"),
+            ("Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato"),
+            ("Tomato___Bacterial_spot", "Tomato"),
+            ("Tomato___Leaf_Mold", "Tomato"),
+            ("Tomato___Tomato_mosaic_virus", "Tomato"),
+        ]
+
+        for model_class, crop in mapped_classes:
+            ro = agent.query_candidate(model_class, crop=crop)
+            assert ro.found is True, f"Expected found=True for {model_class}"
+            assert len(ro.citations) > 0, f"Citations must be non-empty for {model_class}"
+            for cit in ro.citations:
+                assert cit.tag, f"Citation tag missing in {model_class}"
+                assert cit.title, f"Citation title missing in {model_class}"
+                if cit.url:
+                    assert not cit.url.endswith("-"), f"Citation URL must not end with hyphen in {model_class}: {cit.url}"
+
+    def test_no_citation_url_ends_with_hyphen(self, agent):
+        """Add a test that no citation URL ends with a hyphen across all 14 mapped classes."""
+        mapped_classes = [
+            ("Apple___Apple_scab", "Apple"),
+            ("Apple___Cedar_apple_rust", "Apple"),
+            ("Grape___Black_rot", "Grape"),
+            ("Grape___Esca_(Black_Measles)", "Grape"),
+            ("Corn___Northern_Leaf_Blight", "Corn"),
+            ("Corn___Common_rust", "Corn"),
+            ("Corn___Cercospora_leaf_spot", "Corn"),
+            ("Tomato___Early_blight", "Tomato"),
+            ("Tomato___Late_blight", "Tomato"),
+            ("Tomato___Septoria_leaf_spot", "Tomato"),
+            ("Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato"),
+            ("Tomato___Bacterial_spot", "Tomato"),
+            ("Tomato___Leaf_Mold", "Tomato"),
+            ("Tomato___Tomato_mosaic_virus", "Tomato"),
+        ]
+        all_urls = []
+        for model_class, crop in mapped_classes:
+            ro = agent.query_candidate(model_class, crop=crop)
+            for cit in ro.citations:
+                if cit.url:
+                    all_urls.append(cit.url)
+                    assert not cit.url.endswith("-"), f"Citation URL ends with hyphen in {model_class}: {cit.url}"
+        assert len(all_urls) > 0, "Expected to test at least one citation URL"
+
+    def test_what_to_do_first_extractive_and_short(self, agent):
+        """what_to_do_first comes from Prevention and management, extractive and short."""
+        mapped_classes = [
+            ("Tomato___Late_blight", "Tomato"),
+            ("Apple___Apple_scab", "Apple"),
+            ("Corn___Common_rust", "Corn"),
+            ("Grape___Black_rot", "Grape"),
+        ]
+
+        for model_class, crop in mapped_classes:
+            ro = agent.query_candidate(model_class, crop=crop, include_doses=False)
+            assert ro.what_to_do_first is not None
+            assert len(ro.what_to_do_first) > 10, f"what_to_do_first too short for {model_class}"
+            assert len(ro.what_to_do_first) < 400, f"what_to_do_first too long for {model_class}"
+            # Verify it does not mention chemical dose formulas
+            assert "ml/ha" not in ro.what_to_do_first
+            assert "kg/ha" not in ro.what_to_do_first
+
+    def test_process_vision_output(self, agent):
+        """process_vision_output takes VisionOutput and returns RAGOutput per candidate."""
+        vo = VisionOutput(
+            top_label="Tomato___Late_blight",
+            confidence=0.92,
+            top_k_probs=[
+                ClassProb(label="Tomato___Late_blight", prob=0.92),
+                ClassProb(label="Tomato___Early_blight", prob=0.06),
+                ClassProb(label="Tomato___healthy", prob=0.02),
+            ],
+            image_quality_flags=ImageQualityFlags(),
+            model_version="efficientnet_b3_v1",
+            temperature=1.0,
+            crop="Tomato",
+            top_3_candidates=[
+                ClassProb(label="Tomato___Late_blight", prob=0.92),
+                ClassProb(label="Tomato___Early_blight", prob=0.06),
+                ClassProb(label="Tomato___healthy", prob=0.02),
+            ],
+        )
+
+        results = agent.process_vision_output(vo, include_doses=False)
+        assert len(results) == 3
+
+        # Candidate 1: Late Blight (found=True)
+        assert results[0].model_class == "Tomato___Late_blight"
+        assert results[0].found is True
+        assert results[0].chemical_options == []
+
+        # Candidate 2: Early Blight (found=True)
+        assert results[1].model_class == "Tomato___Early_blight"
+        assert results[1].found is True
+
+        # Candidate 3: healthy (found=False, reason="healthy_class")
+        assert results[2].model_class == "Tomato___healthy"
+        assert results[2].found is False
+        assert results[2].reason == "healthy_class"
+
+    def test_index_rebuild_is_deterministic(self):
+        """Index rebuild is deterministic (same chunk count twice)."""
+        chunks1, reports1 = ingest_knowledge_base()
+        chunks2, reports2 = ingest_knowledge_base()
+
+        assert len(chunks1) == len(chunks2) == 459
+        ids1 = [c.chunk_id for c in chunks1]
+        ids2 = [c.chunk_id for c in chunks2]
+        assert ids1 == ids2

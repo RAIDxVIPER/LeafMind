@@ -176,7 +176,7 @@ VECTOR_DB_PATH=vector_db/
 - [x] **Part 6:** Research validity review, constraint registers, and final implementation blueprint.
 - [x] **C1 — Data Prep:** Manifest generation, perceptual deduplication, split leakage audit, class maps, and threat tier definitions.
 - [x] **C2 — Vision Model:** EfficientNet-B3 classifier training, temperature calibration (model of record: `checkpoints/run1`), crop-masked inference, and OOD diagnostics.
-- [ ] **C3 — RAG Agent:** Agricultural extension vector store, semantic retrieval, and citation grounding (Planned).
+- [x] **C3 — RAG Agent:** Agricultural knowledge retrieval across 6 crop manuals (441 chunks, 63 chapters), FAISS vector store, exact candidate metadata matching, verification tagging (V1–V3), and 100% grounded extractive assembly (no LLM generation).
 - [ ] **C4 — Weather Agent:** Micro-climate meteorological fetching (Open-Meteo), cache, and risk factor extraction (Planned).
 - [ ] **C5 — Risk & Reasoning Agent:** Pathogen threat tiering, meteorological favorability, and composite scoring (Planned).
 - [ ] **C6 — Recommendation Agent:** Plain-language treatment advisory, chemical/cultural guidance, and safety intervals (Planned).

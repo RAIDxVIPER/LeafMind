@@ -167,6 +167,7 @@ Dataset/
 Dataset_2/
 data/
 vector_db/
+scratch/
 *.db
 *.sqlite
 *.sqlite3
