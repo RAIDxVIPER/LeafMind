@@ -1,0 +1,111 @@
+# LeafMind Weather Disease-Risk Rules (W01–W08)
+# Sourced from spec: docs/spec/part2_ml_knowledge.md §2c-v and docs/spec/part6_build_spec.md §6d-v
+# IMPORTANT: All rule thresholds are [UNVERIFIED — I14] and require plant pathologist validation.
+# W08 is a general agronomic heuristic without peer-reviewed citation [GAP] and is excluded from active scoring per spec Part 6 §6d-v.
+
+rules:
+  - id: "W01"
+    condition_name: "Late blight favourable conditions (W01)"
+    disease: "Late blight (Phytophthora infestans)"
+    applicable_classes:
+      - "Tomato___Late_blight"
+      - "Potato___Late_blight"
+    threshold_expression: "RH > 90% AND temp_min < 18°C [UNVERIFIED — I14]"
+    threshold_source: "Fry, W.E. (1977) — Phytophthora infestans epidemiology [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      rh_min: 90.0        # RH > 90%
+      temp_min_max: 18.0  # temp_min < 18°C
+
+  - id: "W02"
+    condition_name: "Powdery mildew favourable conditions (W02)"
+    disease: "Powdery mildew (general)"
+    applicable_classes:
+      - "Squash___Powdery_mildew"
+      - "Apple___Powdery_mildew"
+      - "Cherry___Powdery_mildew"
+      - "Peach___Powdery_mildew"
+      - "Grape___Powdery_mildew"
+    threshold_expression: "RH < 50% AND temp 20–30°C [UNVERIFIED — I14]"
+    threshold_source: "Yarwood, C.E. (1957) — Powdery mildew biology [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      rh_max: 50.0
+      temp_range: [20.0, 30.0]
+
+  - id: "W03"
+    condition_name: "Bacterial spot favourable conditions (W03)"
+    disease: "Bacterial spot (Xanthomonas)"
+    applicable_classes:
+      - "Tomato___Bacterial_spot"
+      - "Pepper,_bell___Bacterial_spot"
+      - "Peach___Bacterial_spot"
+    threshold_expression: "temp > 24°C AND precipitation > 0 AND wind > 15 km/h [UNVERIFIED — I14]"
+    threshold_source: "Ritchie & Dittapongpitch (1991) [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      temp_min: 24.0
+      precip_min: 0.0
+      wind_min: 15.0
+
+  - id: "W04"
+    condition_name: "Early blight favourable conditions (W04)"
+    disease: "Early blight (Alternaria solani)"
+    applicable_classes:
+      - "Tomato___Early_blight"
+      - "Potato___Early_blight"
+    threshold_expression: "temp > 24°C AND (precip_hours > 2 OR leaf_wetness_proxy > 2h) [UNVERIFIED — I14]"
+    threshold_source: "Jones & Jones (1974) — Alternaria epidemiology [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      temp_min: 24.0
+      precip_hours_min: 2
+      leaf_wetness_hours_min: 2  # [ENG proxy]
+
+  - id: "W05"
+    condition_name: "Septoria leaf spot favourable conditions (W05)"
+    disease: "Septoria leaf spot (Septoria lycopersici)"
+    applicable_classes:
+      - "Tomato___Septoria_leaf_spot"
+    threshold_expression: "temp 15–25°C AND RH > 85% [UNVERIFIED — I14]"
+    threshold_source: "Seem & Russo (1984) [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      temp_range: [15.0, 25.0]
+      rh_min: 85.0
+
+  - id: "W06"
+    condition_name: "Yellow leaf curl virus vector favourable conditions (W06)"
+    disease: "Tomato Yellow Leaf Curl Virus (vector: whitefly)"
+    applicable_classes:
+      - "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
+    threshold_expression: "temp > 28°C AND RH < 40% [UNVERIFIED — I14]"
+    threshold_source: "Byrne & Brown (1996) — Bemisia tabaci activity [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      temp_min: 28.0
+      rh_max: 40.0
+
+  - id: "W07"
+    condition_name: "Rust favourable conditions (W07)"
+    disease: "Rust (Puccinia spp.)"
+    applicable_classes:
+      - "Corn___Common_rust"
+      - "Apple___Cedar_apple_rust"
+    threshold_expression: "temp 15–22°C AND dew_point within 2°C of temp_min [UNVERIFIED — I14]"
+    threshold_source: "Eversmeyer & Kramer (2000) [UNVERIFIED — I14]"
+    time_window: "past_24h"
+    criteria:
+      temp_range: [15.0, 22.0]
+      dew_point_diff_max: 2.0
+
+  - id: "W08"
+    condition_name: "General epidemic risk (post-rain) (W08)"
+    disease: "General epidemic risk"
+    applicable_classes: []
+    threshold_expression: "precipitation_sum > 10mm in last 24h [GAP — unverified heuristic]"
+    threshold_source: "[GAP] General agronomic heuristic — no peer-reviewed citation; omitted from production scoring per spec Part 6 §6d-v"
+    time_window: "past_24h"
+    omitted_from_scoring: true  # per Part 4 §4a-iv & Part 6 §6d-v
+    criteria:
+      precip_sum_min: 10.0

@@ -9,7 +9,7 @@ Copied verbatim — do NOT modify field names or types without updating the spec
 from __future__ import annotations
 from datetime import datetime, date
 from typing import Optional, List, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import uuid
 
 
@@ -20,8 +20,11 @@ class FarmerRequest(BaseModel):
     farmer_id: str = Field(..., description="Unique farmer identifier")
     image_bytes: bytes = Field(..., description="Raw image bytes (JPEG or PNG)")
     image_mime_type: str = Field(..., pattern=r"^image/(jpeg|png)$")
-    gps_lat: float = Field(..., ge=-90.0, le=90.0)
-    gps_lon: float = Field(..., ge=-180.0, le=180.0)
+    gps_lat: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    gps_lon: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    place_name: Optional[str] = Field(None, description="Village, town, or PIN")
     crop_type: Optional[str] = Field(None, description="Optional farmer-supplied crop name")
     submitted_at: datetime
     is_followup: bool = Field(False)
@@ -33,6 +36,18 @@ class FarmerRequest(BaseModel):
         if info.data.get("is_followup") and v is None:
             raise ValueError("case_id is required when is_followup=True")
         return v
+
+    @model_validator(mode="after")
+    def sync_coords(self) -> "FarmerRequest":
+        if self.latitude is None and self.gps_lat is not None:
+            self.latitude = self.gps_lat
+        elif self.gps_lat is None and self.latitude is not None:
+            self.gps_lat = self.latitude
+        if self.longitude is None and self.gps_lon is not None:
+            self.longitude = self.gps_lon
+        elif self.gps_lon is None and self.longitude is not None:
+            self.gps_lon = self.longitude
+        return self
 
 
 # ── Vision Agent ───────────────────────────────────────────────────────────────
@@ -137,9 +152,25 @@ class VisionOutput(BaseModel):
 # ── Weather Agent ──────────────────────────────────────────────────────────────
 
 class WeatherInput(BaseModel):
-    gps_lat: float = Field(..., ge=-90.0, le=90.0)
-    gps_lon: float = Field(..., ge=-180.0, le=180.0)
-    query_datetime: datetime
+    gps_lat: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    gps_lon: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    place_name: Optional[str] = Field(None, description="Village, town, or PIN")
+    query_datetime: Optional[datetime] = None
+    detected_disease: Optional[str] = Field(None, description="Optional diagnosed disease class for computing weather_score")
+
+    @model_validator(mode="after")
+    def sync_coords(self) -> "WeatherInput":
+        if self.latitude is None and self.gps_lat is not None:
+            self.latitude = self.gps_lat
+        elif self.gps_lat is None and self.latitude is not None:
+            self.gps_lat = self.latitude
+        if self.longitude is None and self.gps_lon is not None:
+            self.longitude = self.gps_lon
+        elif self.gps_lon is None and self.longitude is not None:
+            self.gps_lon = self.longitude
+        return self
 
 class CurrentWeather(BaseModel):
     temperature_c: float
@@ -165,16 +196,80 @@ class WeatherRiskFlag(BaseModel):
     threshold: str              # Human-readable threshold expression
     threshold_source: str       # Citation; "[UNVERIFIED — I14]" appended where applicable
 
+class WeatherWindow(BaseModel):
+    past_days: int = Field(7, description="Number of past days analyzed [ENG]")
+    forecast_days: int = Field(3, description="Number of forecast days analyzed [ENG]")
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+class WeatherSummaryStats(BaseModel):
+    mean_temperature_c: float
+    max_temperature_c: float
+    min_temperature_c: float
+    mean_relative_humidity_pct: float
+    max_relative_humidity_pct: float
+    min_relative_humidity_pct: float
+    total_precipitation_mm: float
+    precipitation_hours: int
+    hours_rh_above_threshold: int = Field(..., description="Hours with RH >= 90% [ENG proxy]")
+    leaf_wetness_hours_proxy: int = Field(..., description="Hours with RH >= 90% and/or precip > 0.1mm [ENG proxy]")
+    max_wind_speed_kmh: float
+
+class RuleTriggerResult(BaseModel):
+    rule_id: str
+    condition_name: str
+    triggered: bool
+    measured_values: str
+    threshold: str
+    time_window: str
+    threshold_source: str
+    disease_targets: List[str] = Field(default_factory=list)
+    tag: str = "[UNVERIFIED — I14]"
+    omitted_from_scoring: bool = False
+
 class WeatherOutput(BaseModel):
     weather_available: bool
     weather_partial: bool = False
     cache_hit: bool = False
     cache_stale: bool = False
+    stale: bool = False
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    location_name: Optional[str] = None
+    location_admin: Optional[str] = None
+    location_source: Optional[str] = Field(None, pattern=r"^(gps|geocoded|default)$")
+    is_ambiguous_location: bool = False
+    ambiguity_flag: bool = False
+    weather_fetch_timestamp: Optional[datetime] = None
+    fetched_at: Optional[datetime] = None
+    data_window: Optional[WeatherWindow] = None
+    summary_statistics: Optional[WeatherSummaryStats] = None
     current_weather: Optional[CurrentWeather] = None
     forecast_7day: Optional[List[DailyForecast]] = None
     disease_risk_flags: List[WeatherRiskFlag] = Field(default_factory=list)
+    rules_triggered: List[RuleTriggerResult] = Field(default_factory=list)
+    weather_score: float = Field(0.0, ge=0.0, le=1.0, description="Computed per Part 4 formula [ENG]")
     weather_data_source: Optional[str] = None   # "open-meteo" | "openweathermap" | null
-    weather_fetch_timestamp: Optional[datetime] = None
+    unavailable_reason: Optional[str] = None
+
+    @model_validator(mode="after")
+    def sync_aliases(self) -> "WeatherOutput":
+        # Synchronize stale / cache_stale
+        if self.cache_stale and not self.stale:
+            self.stale = True
+        elif self.stale and not self.cache_stale:
+            self.cache_stale = True
+        # Synchronize fetched_at / weather_fetch_timestamp
+        if self.weather_fetch_timestamp and not self.fetched_at:
+            self.fetched_at = self.weather_fetch_timestamp
+        elif self.fetched_at and not self.weather_fetch_timestamp:
+            self.weather_fetch_timestamp = self.fetched_at
+        # Synchronize ambiguity_flag / is_ambiguous_location
+        if self.is_ambiguous_location and not self.ambiguity_flag:
+            self.ambiguity_flag = True
+        elif self.ambiguity_flag and not self.is_ambiguous_location:
+            self.is_ambiguous_location = True
+        return self
 
 
 # ── RAG Agent ──────────────────────────────────────────────────────────────────

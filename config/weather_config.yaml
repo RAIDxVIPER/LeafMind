@@ -1,0 +1,65 @@
+# LeafMind Weather Agent Configuration
+# Date: 2026-10-22
+# Provenance tags: [ENG] = engineering decision, [ENG default] = fallback parameter, [ENG proxy] = derived variable
+
+default_location:
+  name: "Maharashtra (default)"  # [ENG default]
+  admin_region: "Maharashtra"     # [ENG default]
+  country: "India"
+  country_code: "IN"
+  latitude: 19.7515               # [ENG default] Maharashtra representative coordinates
+  longitude: 75.7139              # [ENG default]
+  note: "[ENG default] Default region used when no coordinates or place name provided in request"
+
+geocoding:
+  base_url: "https://geocoding-api.open-meteo.com/v1/search"
+  count: 10
+  language: "en"
+  default_country_code: "IN"
+  timeout_seconds: 5.0
+  max_retries: 2
+  backoff_factor: 0.5
+  user_agent: "LeafMind-WeatherAgent/1.0 (+https://github.com/RAIDxVIPER/LeafMind)"
+
+weather_api:
+  primary:
+    provider: "open-meteo"
+    base_url: "https://api.open-meteo.com/v1/forecast"
+    past_days: 7      # [ENG] Past N days window per spec
+    forecast_days: 3  # [ENG] Forecast M days window per spec
+    hourly_variables:
+      - "temperature_2m"
+      - "relative_humidity_2m"
+      - "precipitation"
+      - "wind_speed_10m"
+      - "dew_point_2m"
+      - "cloud_cover"
+    daily_variables:
+      - "temperature_2m_max"
+      - "temperature_2m_min"
+      - "relative_humidity_2m_max"
+      - "precipitation_sum"
+      - "precipitation_hours"
+      - "wind_speed_10m_max"
+    timezone: "auto"
+    timeout_seconds: 5.0
+    max_retries: 2
+    backoff_factor: 0.5
+    user_agent: "LeafMind-WeatherAgent/1.0 (+https://github.com/RAIDxVIPER/LeafMind)"
+  backup:
+    provider: "openweathermap"
+    enabled: false
+    base_url: "https://api.openweathermap.org/data/2.5/forecast"
+    api_key_env: "OPENWEATHERMAP_API_KEY"
+    timeout_seconds: 5.0
+
+cache:
+  coord_rounding_decimals: 2  # ~1.1 km radius rounding for spatial aggregation [ENG]
+  ttl_seconds: 1800           # 30 minutes TTL for fresh cache [ENG assumption]
+  max_stale_age_hours: 24     # Serve stale cache on API outage up to 24h max age [ENG assumption]
+  max_entries: 1000           # In-memory LRU limit
+
+leaf_wetness_proxy:
+  rh_threshold_pct: 90.0      # [ENG proxy] Hours with RH >= 90% count towards leaf wetness
+  precip_threshold_mm: 0.1    # [ENG proxy] Hours with precip >= 0.1mm count towards leaf wetness
+  note: "[ENG proxy] Open-Meteo does not provide a direct leaf-wetness sensor. Leaf wetness is derived as hours with RH >= 90% and/or precipitation >= 0.1mm."

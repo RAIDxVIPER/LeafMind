@@ -297,6 +297,39 @@ class TestWeatherOutput:
         )
         assert flag.triggered is True
 
+    def test_weather_output_c4_fields(self):
+        wo = WeatherOutput(
+            weather_available=True,
+            latitude=19.75,
+            longitude=75.71,
+            location_name="Maharashtra",
+            location_source="default",
+            is_ambiguous_location=False,
+            stale=False,
+            weather_score=0.25,
+            unavailable_reason=None,
+        )
+        assert wo.location_source == "default"
+        assert wo.stale == wo.cache_stale
+        assert wo.ambiguity_flag == wo.is_ambiguous_location
+        assert wo.weather_score == 0.25
+
+    def test_weather_input_c4_fields(self):
+        wi = WeatherInput(place_name="Nashik", query_datetime=NOW, detected_disease="Tomato___Late_blight")
+        assert wi.place_name == "Nashik"
+        assert wi.detected_disease == "Tomato___Late_blight"
+
+    def test_farmer_request_c4_fields(self):
+        req = FarmerRequest(
+            farmer_id="F001",
+            image_bytes=b"fake",
+            image_mime_type="image/jpeg",
+            place_name="Pune",
+            submitted_at=NOW,
+        )
+        assert req.place_name == "Pune"
+        assert req.gps_lat is None
+
 
 # ── Tests: RAGOutput ────────────────────────────────────────────────────────────
 
