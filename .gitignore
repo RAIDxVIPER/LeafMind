@@ -165,9 +165,12 @@ temp/
 # LeafMind-specific
 Dataset/
 Dataset_2/
-data/
+data/*
 vector_db/
 scratch/
 *.db
 *.sqlite
 *.sqlite3
+!data/knowledge_base/
+!data/knowledge_base/*.pdf
+!data/knowledge_base/*.docx
