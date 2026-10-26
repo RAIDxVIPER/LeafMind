@@ -32,11 +32,11 @@ def ingested_data():
 
 class TestRAGIngestion:
 
-    def test_all_six_pdfs_present(self, ingested_data):
+    def test_all_eight_pdfs_present(self, ingested_data):
         chunks, reports = ingested_data
-        assert len(reports) == 6, f"Expected 6 PDF reports, got {len(reports)}"
+        assert len(reports) == 8, f"Expected 8 PDF reports, got {len(reports)}"
         crops = {r["crop"] for r in reports}
-        assert crops == {"Apple", "Blueberry", "Cherry", "Grape", "Corn", "Tomato"}
+        assert crops == {"Apple", "Blueberry", "Cherry", "Grape", "Corn", "Tomato", "Potato", "Pepper,_bell"}
 
     EXPECTED_CHAPTER_COUNTS = {
         "Tomato": 12,
@@ -45,6 +45,8 @@ class TestRAGIngestion:
         "Cherry": 6,
         "Apple": 9,
         "Blueberry": 7,
+        "Potato": 10,
+        "Pepper,_bell": 7,
     }
 
     EXPECTED_CHAPTER_TITLES = {
@@ -123,13 +125,34 @@ class TestRAGIngestion:
             "Leaf Mould",
             "Tomato Mosaic Virus (and related mosaic viruses)",
         ],
+        "Potato": [
+            "Late Blight",
+            "Early Blight (Alternaria Leaf Spot)",
+            "Black Scurf and Stem Canker",
+            "Common Scab",
+            "Bacterial Wilt (Brown Rot)",
+            "Soft Rot and Blackleg",
+            "Fusarium Dry Rot",
+            "Silver Scurf",
+            "Potato Viruses (Leaf Roll, Y, X and Apical Leaf Curl)",
+            "Potato Wart (Quarantine Disease)",
+        ],
+        "Pepper,_bell": [
+            "Bacterial Spot (Bacterial Leaf Spot)",
+            "Anthracnose, Fruit Rot and Die-back",
+            "Powdery Mildew",
+            "Cercospora Leaf Spot (Frog-eye)",
+            "Damping-off (Nursery)",
+            "Fusarium Wilt (Root Wilt)",
+            "Chilli Leaf Curl and Other Viral Diseases",
+        ],
     }
 
     def test_all_chapters_yield_all_six_sections(self, ingested_data):
         """Report any chapter where a section is missing instead of failing silently."""
         chunks, reports = ingested_data
         total_chapters = sum(r["chapters_found"] for r in reports)
-        assert total_chapters == 63, f"Expected 63 total chapters across 6 PDFs, got {total_chapters}"
+        assert total_chapters == 80, f"Expected 80 total chapters across 8 PDFs, got {total_chapters}"
 
         all_missing = {}
         for r in reports:
@@ -139,7 +162,7 @@ class TestRAGIngestion:
         assert not all_missing, f"Chapters with missing sections detected: {all_missing}"
 
     def test_exact_expected_chapter_counts_per_crop(self, ingested_data):
-        """Assert exact expected chapter counts per crop: Tomato 12, Maize 18, Grape 11, Cherry 6, Apple 9, Blueberry 7."""
+        """Assert exact expected chapter counts per crop: Tomato 12, Maize 18, Grape 11, Cherry 6, Apple 9, Blueberry 7, Potato 10, Pepper 7."""
         chunks, reports = ingested_data
         counts = {r["crop"]: r["chapters_found"] for r in reports}
         assert counts == self.EXPECTED_CHAPTER_COUNTS, f"Chapter count mismatch: {counts}"
@@ -155,7 +178,6 @@ class TestRAGIngestion:
                         seen.append(c.disease_name)
             assert seen == expected_titles, f"Titles mismatch for {crop}:\nFound: {seen}\nExpected: {expected_titles}"
 
-
     def test_grape_esca_black_measles_exists_and_mapped(self, ingested_data):
         """Confirm Grape Esca (Black Measles) exists, has all sections, and is mapped to Grape___Esca_(Black_Measles)."""
         chunks, _ = ingested_data
@@ -164,11 +186,25 @@ class TestRAGIngestion:
         for c in esca_chunks:
             assert c.model_class == "Grape___Esca_(Black_Measles)"
 
+    def test_potato_and_pepper_mapped_classes_exist(self, ingested_data):
+        """Confirm Potato and Pepper mapped classes exist, have all sections, and are correctly mapped."""
+        chunks, _ = ingested_data
+        mapped_expected = [
+            ("Potato", "Potato___Late_blight", "Late Blight"),
+            ("Potato", "Potato___Early_blight", "Early Blight (Alternaria Leaf Spot)"),
+            ("Pepper,_bell", "Pepper,_bell___Bacterial_spot", "Bacterial Spot (Bacterial Leaf Spot)"),
+        ]
+        for crop, model_class, title in mapped_expected:
+            matching = [c for c in chunks if c.crop == crop and c.model_class == model_class]
+            assert len(matching) == 7, f"Expected 7 chunks for {model_class}, got {len(matching)}"
+            sections = {c.section for c in matching}
+            assert sections == set(STANDARD_SECTIONS) | {"At a glance"}
+
     def test_glance_chunk_type_per_chapter(self, ingested_data):
         """Every chapter must yield an 'At a glance' chunk with chunk_type='glance'."""
         chunks, _ = ingested_data
         glance_chunks = [c for c in chunks if c.chunk_type == "glance"]
-        assert len(glance_chunks) == 63, f"Expected 63 glance chunks, got {len(glance_chunks)}"
+        assert len(glance_chunks) == 80, f"Expected 80 glance chunks, got {len(glance_chunks)}"
         for g in glance_chunks:
             assert g.section == "At a glance"
             assert len(g.text) > 20
@@ -181,7 +217,7 @@ class TestRAGIngestion:
             if c.indexed_for_farmer:
                 by_disease.setdefault((c.crop, c.disease_name), []).append(c)
 
-        assert len(by_disease) == 63
+        assert len(by_disease) == 80
         for (crop, disease), ch_chunks in by_disease.items():
             sections = {c.section for c in ch_chunks}
             expected = set(STANDARD_SECTIONS) | {"At a glance"}
@@ -192,7 +228,7 @@ class TestRAGIngestion:
         """Keep the 'confirm current label' caveat and CIB&RC date note attached to every Remedies chunk."""
         chunks, _ = ingested_data
         remedies = [c for c in chunks if c.section == "Remedies and treatment"]
-        assert len(remedies) == 63
+        assert len(remedies) == 80
 
         for r in remedies:
             assert len(r.caveats) >= 1, f"Missing caveats in {r.chunk_id}"
@@ -205,7 +241,7 @@ class TestRAGIngestion:
         """Do not index intro/summary/appendix chunks for farmer answers (store them, but exclude by default)."""
         chunks, _ = ingested_data
         non_farmer = [c for c in chunks if not c.indexed_for_farmer]
-        assert len(non_farmer) >= 12  # At least 6 intro + 6 summary table
+        assert len(non_farmer) >= 16  # At least 8 intro + 8 summary table
 
         for nf in non_farmer:
             assert nf.chunk_type in ("intro", "summary", "appendix", "sources")

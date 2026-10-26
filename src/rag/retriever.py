@@ -236,8 +236,8 @@ class KBRetriever:
         import faiss
         faiss.normalize_L2(query_vec)
 
-        # Retrieve more candidates to allow strict crop filtering
-        num_candidates = min(len(self.index.faiss_chunk_ids), max(50, top_k * 10))
+        # Retrieve more candidates to allow strict crop filtering across expanded crops
+        num_candidates = min(len(self.index.faiss_chunk_ids), max(250, top_k * 20))
         scores, indices = self.index.faiss_index.search(query_vec, num_candidates)
 
         results: List[Tuple[KBChunk, float]] = []

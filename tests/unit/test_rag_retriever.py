@@ -44,6 +44,9 @@ class TestRAGRetriever:
             ("Tomato___Bacterial_spot", "Tomato", "Bacterial Leaf Spot (Bacterial Spot)"),
             ("Tomato___Leaf_Mold", "Tomato", "Leaf Mould"),
             ("Tomato___Tomato_mosaic_virus", "Tomato", "Tomato Mosaic Virus (and related mosaic viruses)"),
+            ("Potato___Late_blight", "Potato", "Late Blight"),
+            ("Potato___Early_blight", "Potato", "Early Blight (Alternaria Leaf Spot)"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell", "Bacterial Spot (Bacterial Leaf Spot)"),
         ]
 
         for model_class, expected_crop, expected_disease in expected_mappings:
@@ -61,11 +64,26 @@ class TestRAGRetriever:
             assert res.sources_chunk is not None
 
     def test_no_cross_crop_leakage(self, retriever):
-        """Cross-crop queries must be rejected to prevent leakage."""
+        """Cross-crop queries must be rejected to prevent leakage (bidirectional Tomato <-> Potato)."""
         # Querying Tomato Early Blight under Potato crop filter must fail
         res = retriever.retrieve_for_candidate("Tomato___Early_blight", crop="Potato")
         assert res.found is False
         assert res.reason == "crop_mismatch"
+
+        # Querying Potato Early Blight under Tomato crop filter must fail
+        res_p_eb = retriever.retrieve_for_candidate("Potato___Early_blight", crop="Tomato")
+        assert res_p_eb.found is False
+        assert res_p_eb.reason == "crop_mismatch"
+
+        # Querying Tomato Late Blight under Potato crop filter must fail
+        res_t_lb = retriever.retrieve_for_candidate("Tomato___Late_blight", crop="Potato")
+        assert res_t_lb.found is False
+        assert res_t_lb.reason == "crop_mismatch"
+
+        # Querying Potato Late Blight under Tomato crop filter must fail
+        res_p_lb = retriever.retrieve_for_candidate("Potato___Late_blight", crop="Tomato")
+        assert res_p_lb.found is False
+        assert res_p_lb.reason == "crop_mismatch"
 
         # Querying Apple Scab under Grape crop filter must fail
         res_apple = retriever.retrieve_for_candidate("Apple___Apple_scab", crop="Grape")
@@ -74,10 +92,8 @@ class TestRAGRetriever:
 
     def test_missing_chapter_kb_gap(self, retriever):
         """Diseased classes without KB chapters return kb_gap=True and found=False."""
+        # Only Squash___Powdery_mildew remains an expected gap
         missing_classes = [
-            "Pepper,_bell___Bacterial_spot",
-            "Potato___Early_blight",
-            "Potato___Late_blight",
             "Squash___Powdery_mildew",
         ]
         for mc in missing_classes:
@@ -85,6 +101,17 @@ class TestRAGRetriever:
             assert res.found is False, f"{mc} should not be found"
             assert res.kb_gap is True, f"{mc} should set kb_gap=True"
             assert res.reason == "no_kb_chapter"
+
+        # Confirm newly added classes no longer return kb_gap=True
+        newly_added = [
+            "Pepper,_bell___Bacterial_spot",
+            "Potato___Early_blight",
+            "Potato___Late_blight",
+        ]
+        for mc in newly_added:
+            res = retriever.retrieve_for_candidate(mc)
+            assert res.found is True, f"{mc} should now be found"
+            assert res.kb_gap is False, f"{mc} must not return kb_gap=True"
 
     def test_healthy_class_handling(self, retriever):
         """Healthy classes return found=False, kb_gap=False, reason='healthy_class'."""
@@ -123,7 +150,7 @@ class TestRAGRetriever:
 
     def test_semantic_search_never_leaks_cross_crop(self, retriever):
         """Semantic search must strictly return chunks matching the specified crop only."""
-        crops_to_test = ["Tomato", "Apple", "Corn", "Grape", "Cherry", "Blueberry"]
+        crops_to_test = ["Tomato", "Apple", "Corn", "Grape", "Cherry", "Blueberry", "Potato", "Pepper,_bell"]
         query = "spots on leaves and fruit rot with wilting"
 
         for crop in crops_to_test:

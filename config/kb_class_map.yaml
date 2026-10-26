@@ -217,17 +217,35 @@ crops:
         model_class: null
         aliases: ["tomato spotted wilt", "bud necrosis", "tswv"]
 
-  # Future crops (ready for pipeline pickup when PDFs are added)
   Potato:
     aliases:
       - "potato"
     diseases:
-      "Early Blight":
-        model_class: "Potato___Early_blight"
-        aliases: ["potato early blight", "early blight"]
       "Late Blight":
         model_class: "Potato___Late_blight"
         aliases: ["potato late blight", "late blight"]
+      "Early Blight (Alternaria Leaf Spot)":
+        model_class: "Potato___Early_blight"
+        aliases: ["potato early blight", "early blight", "alternaria leaf spot"]
+      "Black Scurf and Stem Canker":
+        model_class: null
+      "Common Scab":
+        model_class: null
+      "Bacterial Wilt (Brown Rot)":
+        model_class: null
+        aliases: ["bacterial wilt", "brown rot"]
+      "Soft Rot and Blackleg":
+        model_class: null
+      "Fusarium Dry Rot":
+        model_class: null
+      "Silver Scurf":
+        model_class: null
+      "Potato Viruses (Leaf Roll, Y, X and Apical Leaf Curl)":
+        model_class: null
+        aliases: ["potato viruses", "leaf roll", "apical leaf curl"]
+      "Potato Wart (Quarantine Disease)":
+        model_class: null
+        aliases: ["potato wart", "wart"]
 
   Pepper,_bell:
     aliases:
@@ -238,9 +256,26 @@ crops:
       - "bell_pepper"
       - "bell pepper"
     diseases:
-      "Bacterial Spot":
+      "Bacterial Spot (Bacterial Leaf Spot)":
         model_class: "Pepper,_bell___Bacterial_spot"
         aliases: ["bacterial spot", "bacterial leaf spot", "pepper bacterial spot"]
+      "Anthracnose, Fruit Rot and Die-back":
+        model_class: null
+        aliases: ["anthracnose", "fruit rot", "die-back", "anthracnose fruit rot and die-back"]
+      "Powdery Mildew":
+        model_class: null
+      "Cercospora Leaf Spot (Frog-eye)":
+        model_class: null
+        aliases: ["cercospora leaf spot", "frog-eye"]
+      "Damping-off (Nursery)":
+        model_class: null
+        aliases: ["damping-off", "damping off"]
+      "Fusarium Wilt (Root Wilt)":
+        model_class: null
+        aliases: ["fusarium wilt", "root wilt"]
+      "Chilli Leaf Curl and Other Viral Diseases":
+        model_class: null
+        aliases: ["chilli leaf curl", "leaf curl", "viral diseases"]
 
   Squash:
     aliases:
@@ -252,9 +287,6 @@ crops:
 
 # Known model classes without current KB chapter (expected gaps)
 model_classes_without_kb:
-  - "Pepper,_bell___Bacterial_spot"
-  - "Potato___Early_blight"
-  - "Potato___Late_blight"
   - "Squash___Powdery_mildew"
 
 # Healthy classes (no KB disease chapter required; return found=False, reason="healthy_class")

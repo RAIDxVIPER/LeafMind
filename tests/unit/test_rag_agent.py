@@ -45,7 +45,7 @@ class TestRAGAgent:
             assert len(opt.product) > 0
 
     def test_citations_non_empty_for_every_found_result(self, agent):
-        """Citations non-empty for every found result across all 14 mapped classes."""
+        """Citations non-empty for every found result across all 17 mapped classes."""
         mapped_classes = [
             ("Apple___Apple_scab", "Apple"),
             ("Apple___Cedar_apple_rust", "Apple"),
@@ -61,6 +61,9 @@ class TestRAGAgent:
             ("Tomato___Bacterial_spot", "Tomato"),
             ("Tomato___Leaf_Mold", "Tomato"),
             ("Tomato___Tomato_mosaic_virus", "Tomato"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
         ]
 
         for model_class, crop in mapped_classes:
@@ -74,7 +77,7 @@ class TestRAGAgent:
                     assert not cit.url.endswith("-"), f"Citation URL must not end with hyphen in {model_class}: {cit.url}"
 
     def test_no_citation_url_ends_with_hyphen(self, agent):
-        """Add a test that no citation URL ends with a hyphen across all 14 mapped classes."""
+        """Add a test that no citation URL ends with a hyphen across all 17 mapped classes."""
         mapped_classes = [
             ("Apple___Apple_scab", "Apple"),
             ("Apple___Cedar_apple_rust", "Apple"),
@@ -90,6 +93,9 @@ class TestRAGAgent:
             ("Tomato___Bacterial_spot", "Tomato"),
             ("Tomato___Leaf_Mold", "Tomato"),
             ("Tomato___Tomato_mosaic_virus", "Tomato"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
         ]
         all_urls = []
         for model_class, crop in mapped_classes:
@@ -107,6 +113,9 @@ class TestRAGAgent:
             ("Apple___Apple_scab", "Apple"),
             ("Corn___Common_rust", "Corn"),
             ("Grape___Black_rot", "Grape"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
         ]
 
         for model_class, crop in mapped_classes:
@@ -161,7 +170,7 @@ class TestRAGAgent:
         chunks1, reports1 = ingest_knowledge_base()
         chunks2, reports2 = ingest_knowledge_base()
 
-        assert len(chunks1) == len(chunks2) == 459
+        assert len(chunks1) == len(chunks2) == 584
         ids1 = [c.chunk_id for c in chunks1]
         ids2 = [c.chunk_id for c in chunks2]
         assert ids1 == ids2

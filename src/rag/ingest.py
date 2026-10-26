@@ -46,6 +46,14 @@ CROP_CAVEATS: Dict[str, List[str]] = {
     "Blueberry": [
         "No fungicide or bactericide claim for blueberry was matched to the CIB&RC compilation, and no Indian university package for blueberry was found. Confirm current legal status before use.",
         "Chemical information is shown only as active ingredients with US efficacy ratings (tag US), without doses, for reference."
+    ],
+    "Potato": [
+        "Always check the current label and the live CIB&RC register (ppqs.gov.in / cibrc.gov.in) and follow the pre-harvest interval (PHI) printed on the label.",
+        "The CIB&RC compilation used for V1 is 'based on certificate issued' up to 30.09.2025. Registrations and labels change; verify product registration and permitted uses before application."
+    ],
+    "Pepper,_bell": [
+        "Always check the current label and the live CIB&RC register (ppqs.gov.in / cibrc.gov.in) and follow the pre-harvest interval (PHI) printed on the label.",
+        "The CIB&RC compilation used for V1 is dated up to 30.09.2025 where rows name the crop 'chilli'; confirm product registration and label before use on capsicum / bell pepper, especially under protected cultivation."
     ]
 }
 
@@ -280,9 +288,15 @@ def parse_pdf_document(
                 continue
 
             ahead = [lines[j].strip() for j in range(i + 1, min(len(lines), i + 8)) if lines[j].strip()]
+            crop_kw = {"apple", "cherry", "grape", "tomato", "maize", "blueberry", "corn", "prunus", "vitis", "potato", "pepper", "chilli", "capsicum", "solanum"}
+            for c_name, c_info in kb_class_map.get("crops", {}).items():
+                crop_kw.add(c_name.lower())
+                for a in c_info.get("aliases", []):
+                    crop_kw.add(a.lower())
+
             pipe_idx = None
             for idx, al in enumerate(ahead):
-                if "|" in al and ("crop" in al.lower() or "fungal" in al.lower() or "bacterial" in al.lower() or "oomycete" in al.lower() or "viral" in al.lower() or any(c in al.lower() for c in ["apple", "cherry", "grape", "tomato", "maize", "blueberry", "corn", "prunus", "vitis"])):
+                if "|" in al and ("crop" in al.lower() or "fungal" in al.lower() or "bacterial" in al.lower() or "oomycete" in al.lower() or "viral" in al.lower() or any(c in al.lower() for c in crop_kw)):
                     pipe_idx = idx
                     break
 
