@@ -205,17 +205,30 @@ def extract_why_it_happens(causes_chunk: Optional[KBChunk]) -> Optional[str]:
 
 KNOWN_SUPPLEMENTARY_TAGS = {"TXP", "TXT", "TNT", "AUS", "AHDB", "UPL", "BRZ", "SHT"}
 
+BROAD_ACTIVES = [
+    "kasugamycin", "streptocycline", "streptomycin", "oxytetracycline",
+    "mancozeb", "metalaxyl", "metalaxyl-m", "chlorothalonil",
+    "copper oxychloride", "copper hydroxide", "copper sulphate", "bordeaux",
+    "carbendazim", "azoxystrobin", "captan", "difenoconazole", "hexaconazole",
+    "propiconazole", "tebuconazole", "trifloxystrobin", "cymoxanil",
+    "dimethomorph", "fenamidone", "famoxadone", "thiophanate-methyl", "thiophanate",
+    "myclobutanil", "sulphur", "sulfur", "urea spray", "urea sprays", "boric acid",
+    "trichoderma", "pseudomonas",
+]
+
 RE_CHEMICAL_TARGETS = re.compile(
-    r"(?i)\b(?:kasugamycin|streptocycline|urea\s+spray|5%\s*boric|bordeaux\s+paste)\b"
-    r"|\btrichoderma\b[^\n\.;]*?\b\d+\s*(?:g|kg)\s*/\s*(?:kg|ha|ac|acre)\b"
+    r"(?i)\b(?:" + "|".join(re.escape(a) for a in BROAD_ACTIVES) + r")\b"
 )
 
 RE_DOSE_PATTERNS = [
     re.compile(r"\b\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s*(?:/|per)\s*\d*\s*(?:kg|l|L|ha|acre|ac|litre|100\s*L)\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:kg|g)/ac\b", re.I),
     re.compile(r"\b\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)\b", re.I),
     re.compile(r"\b\d+(?:\.\d+)?\s*%\s*\+\s*\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)?\b", re.I),
-    re.compile(r"\b\d+(?:\.\d+)?\s*(?:ppm|mg/L)\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:ppm|mg/L|g/L|ml/L)\b", re.I),
     re.compile(r"\b(?:at\s+)?(?:\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s+)?per\s+100\s*L\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*%\s*(?:boric(?:\s+acid)?|bordeaux(?:\s+(?:paste|mixture))?|urea(?:\s+spray)?)\b", re.I),
+    re.compile(r"\b(?:boric(?:\s+acid)?|bordeaux(?:\s+(?:paste|mixture))?|urea(?:\s+spray)?)\s+\d+(?:\.\d+)?\s*%\b", re.I),
 ]
 
 
@@ -233,54 +246,50 @@ def scrub_doses_and_chemicals(text: Optional[str]) -> Optional[str]:
     if not has_chemical and not has_dose:
         return text
 
-    lines = text.split("\n")
+    # 1. Multi-line sentence scrub (e.g. CIB&RC recommendation and TNAU sprays)
+    cleaned_text = re.sub(
+        r"(?i)For chilli,\s*CIB&RC\s+lists\s+kasugamycin[^\.]*?bacterial leaf spot\.\s*",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    cleaned_text = re.sub(
+        r"(?i)\bplus\s+streptocycline(?:\s+sprays)?\s*;",
+        ";",
+        cleaned_text,
+    )
+
+    lines = cleaned_text.split("\n")
     kept_lines = []
     for line in lines:
         l_str = line.strip()
-        if RE_CHEMICAL_TARGETS.search(l_str):
-            # Drop entire bullet if it recommends named chemical or rate
-            if any(k in l_str.lower() for k in ["trichoderma", "urea spray", "5% boric", "bordeaux paste"]):
-                continue
-            # If line contains streptocycline or kasugamycin (e.g. in narrative text), remove recommendation clause
-            cleaned_line = line
-            cleaned_line = re.sub(
-                r"(?i)(?:TNAU's recommendation is [^;\.]*streptocycline sprays;\s*)",
-                "",
-                cleaned_line,
-            )
-            cleaned_line = re.sub(
-                r"(?i)(?:For chilli, CIB&RC lists [^\.]*bacterial leaf spot\.\s*)",
-                "",
-                cleaned_line,
-            )
-            cleaned_line = re.sub(r"(?<=\.\s)([a-z])", lambda m: m.group(1).upper(), cleaned_line)
-            cleaned_line = re.sub(r"(?<=^)([a-z])", lambda m: m.group(1).upper(), cleaned_line)
-            if cleaned_line.strip():
-                kept_lines.append(cleaned_line)
+        # Drop entire bullet if it purely recommends named chemical or rate
+        if re.search(r"\b(?:trichoderma|pseudomonas)\b[^\n\.;]*?\b\d+(?:\.\d+)?\s*(?:g|kg)", l_str, re.I):
             continue
-        kept_lines.append(line)
+        if re.search(r"\b(?:urea\s+spray|5%\s*boric|bordeaux\s+paste)\b", l_str, re.I):
+            continue
+
+        cleaned_line = line
+        # Scrub inline rate patterns
+        for pat in RE_DOSE_PATTERNS:
+            cleaned_line = pat.sub("", cleaned_line)
+
+        cleaned_line = re.sub(r"\(\s*\)", "", cleaned_line)
+        cleaned_line = re.sub(r"[ \t]+", " ", cleaned_line)
+        cleaned_line = re.sub(r"\s+;", ";", cleaned_line)
+        cleaned_line = re.sub(r"\s+\.", ".", cleaned_line)
+        cleaned_line = re.sub(r"([.;])\s*([.;])", r"\1", cleaned_line)
+        if cleaned_line.strip():
+            kept_lines.append(cleaned_line)
 
     res = "\n".join(kept_lines)
-
-    # Clean multi-line wrapped sentences
-    res = re.sub(
-        r"(?i)For chilli, CIB&RC lists kasugamycin 3% SL and streptocycline\s*\(9% \+ 1% SP\) for bacterial leaf spot\.\s*",
-        "",
-        res,
-    )
-    res = re.sub(
-        r"(?i)TNAU's recommendation is disease-free seed plus streptocycline sprays;\s*",
-        "",
-        res,
-    )
-    res = re.sub(r"(?i)(?<=\. )([a-z])", lambda m: m.group(1).upper(), res)
-
-    # Scrub remaining inline rate patterns
     for pat in RE_DOSE_PATTERNS:
         res = pat.sub("", res)
 
     res = re.sub(r"\(\s*\)", "", res)
     res = re.sub(r"[ \t]+", " ", res)
+    res = re.sub(r"\s+;", ";", res)
+    res = re.sub(r"\s+\.", ".", res)
     res = re.sub(r"([.;])\s*([.;])", r"\1", res)
     return res.strip()
 
@@ -313,14 +322,14 @@ def extract_what_to_do_first(
     """
     Build what_to_do_first from Section 4 Prevention and management bullets.
     Ordered so immediate actions on an infected crop (sanitation, removing infected parts,
-    irrigation/drainage, a label-checked fungicide mention) come first and resistant-variety
-    advice comes last.
+    irrigation/drainage, clean seed) come first and resistant-variety advice comes last.
+    Spray actions and rationales are rejected/penalized in favour of direct non-chemical imperatives.
     """
     if not prev_chunk or not prev_chunk.text:
         return None
 
-    # Exclude Regional note section so it does not attach to the trailing bullet
-    text = re.sub(r"(?i)\n\s*Regional note.*", "", prev_chunk.text, flags=re.DOTALL)
+    # Exclude Regional note / Maharashtra note / <Word> note section so it never attaches
+    text = re.sub(r"(?i)(?:\n|^)\s*(?:Regional|Maharashtra|[A-Z][a-z]+)\s+note\b.*", "", prev_chunk.text, flags=re.DOTALL)
 
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     if not lines:
@@ -337,7 +346,9 @@ def extract_what_to_do_first(
 
     bullets: List[str] = []
     for b in raw_bullets:
-        clean = re.sub(r"\s+", " ", b).strip()
+        # Strip any trailing section note before continuation line joining
+        b_clean_note = re.sub(r"(?i)(?:\n|^)\s*(?:Regional|Maharashtra|[A-Z][a-z]+)\s+note\b.*", "", b, flags=re.DOTALL)
+        clean = re.sub(r"\s+", " ", b_clean_note).strip()
         if not clean:
             continue
         # Skip section headings or intros that aren't action bullets
@@ -389,11 +400,12 @@ def extract_what_to_do_first(
         )
         chemical_rate_penalty = 50 if (not include_doses and has_chemical_rate) else 0
 
-        # General pesticide spray penalty when include_doses=False
+        # General pesticide spray penalty (starts with or advises spraying)
         has_pesticide_spray = bool(
-            re.search(r"\b(?:spray programme|sprays? started|pesticide)\b", b_low)
+            re.search(r"^(?:Time\s+sprays|Start\s+a\s+preventive\s+spray|Spray\s+programme)\b", bullet, re.I) or
+            (not include_doses and re.search(r"\b(?:spray programme|sprays? started|pesticide spray)\b", b_low))
         )
-        pesticide_penalty = 15 if (not include_doses and has_pesticide_spray) else 0
+        pesticide_penalty = 35 if has_pesticide_spray else 0
 
         # Descriptive resistance statement penalty (e.g. "Resistance to dodine... has been reported")
         is_descriptive_resistance = bool(re.match(r"^Resistance\s+to\b", bullet, re.I))
@@ -414,8 +426,14 @@ def extract_what_to_do_first(
             "ph-2", "ph-3", "released hybrids"
         ])
 
-        # Direct imperative check
-        is_imperative = bool(re.match(r"^(?:[A-Z][a-z]+:?\s+)?(?:Use|Remove|Burn|Bury|Collect|Avoid|Plant|Grow|Raise|Reduce|Clean|Prune|Rotate|Ensure|Time|Scout|Clear|Sanitize|Sanitise|Restrict)\b", bullet))
+        # Direct imperative check (including heading prefixes like "Resistance management: restrict...")
+        is_imperative = bool(
+            re.match(
+                r"^(?:[A-Za-z\s]+:\s+)?(?:Use|Remove|Burn|Bury|Collect|Avoid|Plant|Grow|Raise|Reduce|Clean|Prune|Rotate|Ensure|Scout|Clear|Sanitize|Sanitise|Restrict|Mix|Alternate)\b",
+                bullet,
+                re.I,
+            )
+        ) and not has_pesticide_spray
         imperative_bonus = -3 if (is_imperative and not is_resistant) else 0
 
         base = 5

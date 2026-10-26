@@ -257,10 +257,13 @@ class TestRAGAgent:
                 assert "4 g/kg" in ro_original.prevention
             elif model_class == "Tomato___Late_blight":
                 assert "1.0 kg/ac" in ro_original.prevention
+                assert "Maharashtra note" in ro_scrubbed.prevention
             elif model_class == "Tomato___Septoria_leaf_spot":
                 assert "4 g/kg" in ro_original.prevention
+                assert "Maharashtra note" in ro_scrubbed.prevention
             elif model_class == "Tomato___Bacterial_spot":
                 assert "streptocycline" in ro_original.what_it_is
+                assert "disease-free seed" in ro_scrubbed.what_it_is
             elif model_class == "Pepper,_bell___Bacterial_spot":
                 assert "kasugamycin 3% SL" in ro_original.what_it_is
                 assert "streptocycline" in ro_original.what_it_is
@@ -269,7 +272,7 @@ class TestRAGAgent:
         """
         Verify specific expectations for reworked what_to_do_first:
         1. Pepper bacterial spot: clean seed / healthy transplants.
-        2. Apple scab: Mills infection period monitoring (not urea spray).
+        2. Apple scab: non-chemical imperative (resistance management / restrict applications).
         """
         ro_pepper = agent.query_candidate("Pepper,_bell___Bacterial_spot", crop="Pepper,_bell", include_doses=False)
         assert ro_pepper.what_to_do_first is not None
@@ -278,4 +281,5 @@ class TestRAGAgent:
         ro_apple = agent.query_candidate("Apple___Apple_scab", crop="Apple", include_doses=False)
         assert ro_apple.what_to_do_first is not None
         assert "urea" not in ro_apple.what_to_do_first.lower()
-        assert "mills" in ro_apple.what_to_do_first.lower()
+        assert "time sprays" not in ro_apple.what_to_do_first.lower()
+        assert "restrict the number of applications" in ro_apple.what_to_do_first.lower()

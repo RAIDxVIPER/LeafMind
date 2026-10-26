@@ -285,8 +285,8 @@ class TestRAGIngestion:
         pat_combined_ref = re.compile(r"combined reference", re.IGNORECASE)
         pat_pipe_compiled = re.compile(r"\|\s*Compiled", re.IGNORECASE)
         pat_doc_footer = re.compile(r"\bdiseases\b.*?Page\s+\d+", re.IGNORECASE)
-        # "Regional note" embedded mid-line (not at line start / after newline)
-        pat_regional_note_embedded = re.compile(r"(?<!\n)(?<!^)Regional note", re.IGNORECASE | re.MULTILINE)
+        pat_page_n_standalone = re.compile(r"^[ \t]*Page\s+\d+\s*$", re.IGNORECASE | re.MULTILINE)
+        pat_note_embedded = re.compile(r"^[ \t]*\S+[^\n]*?\b(?:Regional|Maharashtra)\s+note\b", re.IGNORECASE | re.MULTILINE)
 
         violations: list[str] = []
         for chunk in chunks:
@@ -294,31 +294,71 @@ class TestRAGIngestion:
                 continue
             t = chunk.text
             if pat_pipe_page.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: contains '| Page N' footer"
-                )
+                violations.append(f"{chunk.chunk_id}: contains '| Page N' footer")
             if pat_master_doc.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: contains 'master document' footer"
-                )
+                violations.append(f"{chunk.chunk_id}: contains 'master document' footer")
             if pat_combined_ref.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: contains 'combined reference' footer/header"
-                )
+                violations.append(f"{chunk.chunk_id}: contains 'combined reference' footer/header")
             if pat_pipe_compiled.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: contains '| Compiled' footer"
-                )
+                violations.append(f"{chunk.chunk_id}: contains '| Compiled' footer")
             if pat_doc_footer.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: contains '<crop> diseases ... Page N' footer"
-                )
-            if pat_regional_note_embedded.search(t):
-                violations.append(
-                    f"{chunk.chunk_id}: 'Regional note' is mid-line (not own paragraph)"
-                )
+                violations.append(f"{chunk.chunk_id}: contains '<crop> diseases ... Page N' footer")
+            if pat_page_n_standalone.search(t):
+                violations.append(f"{chunk.chunk_id}: contains standalone 'Page N' line")
+            if pat_note_embedded.search(t):
+                violations.append(f"{chunk.chunk_id}: Regional/Maharashtra note is mid-line (not own line)")
+
+        # Also verify across all 17 mapped classes' RAGOutput fields
+        from src.rag.agent import RAGAgent
+        agent = RAGAgent()
+        mapped_17 = [
+            ("Apple___Apple_scab", "Apple"),
+            ("Apple___Cedar_apple_rust", "Apple"),
+            ("Grape___Black_rot", "Grape"),
+            ("Grape___Esca_(Black_Measles)", "Grape"),
+            ("Corn___Northern_Leaf_Blight", "Corn"),
+            ("Corn___Common_rust", "Corn"),
+            ("Corn___Cercospora_leaf_spot", "Corn"),
+            ("Tomato___Early_blight", "Tomato"),
+            ("Tomato___Late_blight", "Tomato"),
+            ("Tomato___Septoria_leaf_spot", "Tomato"),
+            ("Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato"),
+            ("Tomato___Bacterial_spot", "Tomato"),
+            ("Tomato___Leaf_Mold", "Tomato"),
+            ("Tomato___Tomato_mosaic_virus", "Tomato"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
+        ]
+        text_fields = [
+            "what_it_is", "why_it_happens", "what_to_do_first",
+            "prevention", "look_alikes", "favourable_conditions"
+        ]
+        for mc, crop in mapped_17:
+            for inc_doses in (False, True):
+                ro = agent.query_candidate(mc, crop=crop, include_doses=inc_doses)
+                if not ro.found:
+                    continue
+                for f in text_fields:
+                    val = getattr(ro, f, None)
+                    if not val:
+                        continue
+                    if pat_pipe_page.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains '| Page N'")
+                    if pat_master_doc.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains 'master document'")
+                    if pat_combined_ref.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains 'combined reference'")
+                    if pat_pipe_compiled.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains '| Compiled'")
+                    if pat_doc_footer.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains '<crop> diseases ... Page N'")
+                    if pat_page_n_standalone.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): contains standalone 'Page N'")
+                    if pat_note_embedded.search(val):
+                        violations.append(f"RAGOutput {mc}.{f} (doses={inc_doses}): Regional/Maharashtra note is mid-line")
 
         assert not violations, (
-            f"{len(violations)} chunk(s) contain page-header/footer artefacts:\n"
-            + "\n".join(violations[:20])
+            f"{len(violations)} artefact violation(s) found in chunks/RAGOutputs:\n"
+            + "\n".join(violations[:25])
         )

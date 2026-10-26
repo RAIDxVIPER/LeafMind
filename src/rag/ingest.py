@@ -141,23 +141,49 @@ def map_disease_to_model_class(
 # Pattern 3 (Cherry):      "Cherry diseases - combined reference          Page N"
 # ---------------------------------------------------------------------------
 _PAGE_FOOTER_RE = re.compile(
-    r"^[ \t]*[^\n]*\bdiseases\b[^\n]*\bPage\s+\d+\s*$",
+    r"^[ \t]*(?:[^\n]*?(?:master document|combined reference)[^\n]*?(?:\|\s*)?Page\s+\d+|\|\s*Page\s+\d+|Page\s+\d+)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
-# Ensure "Regional note" always begins on its own line (never mid-sentence).
-_REGIONAL_NOTE_RE = re.compile(
-    r"(?<![\n])(?=Regional note)",
-    re.IGNORECASE,
+_GLUED_FOOTER_RE = re.compile(
+    r"^[ \t]*[^\n]*?(?:master document|combined reference)[^\n]*?(?:\|\s*)?Page\s+\d+[ \t]+(?=[A-Za-z])",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# Ensure "Regional note", "Maharashtra note", and any "<Word> note" headings always
+# begin on their own line (never mid-sentence or mid-bullet).
+_NOTE_HEADING_RE = re.compile(
+    r"(?<![\n])(?=(?:Regional|Maharashtra|[A-Z][a-z]+)\s+note\b)",
+    re.MULTILINE,
 )
 
 
-def strip_page_running_header_footer(page_text: str) -> str:
-    """Remove running header/footer lines and normalise 'Regional note' breaks."""
-    # Remove any line matching the footer pattern
-    cleaned = _PAGE_FOOTER_RE.sub("", page_text)
-    # Ensure 'Regional note' starts on a new line (handles page-boundary joins)
-    cleaned = _REGIONAL_NOTE_RE.sub("\n", cleaned)
+def strip_page_running_header_footer(page_text: str) -> Tuple[str, int]:
+    """Remove running header/footer lines and normalise '<Word> note' heading breaks.
+
+    Returns (cleaned_text, n_removed).
+    """
+    n_removed = 0
+
+    def _sub_glued(m: re.Match) -> str:
+        nonlocal n_removed
+        n_removed += 1
+        return "\n"
+
+    def _sub_standalone(m: re.Match) -> str:
+        nonlocal n_removed
+        n_removed += 1
+        return ""
+
+    cleaned = _GLUED_FOOTER_RE.sub(_sub_glued, page_text)
+    cleaned = _PAGE_FOOTER_RE.sub(_sub_standalone, cleaned)
+    cleaned = _NOTE_HEADING_RE.sub("\n", cleaned)
+    return cleaned, n_removed
+
+
+def strip_page_running_header_footer_str(page_text: str) -> str:
+    """Thin wrapper returning only cleaned text for existing callers."""
+    cleaned, _ = strip_page_running_header_footer(page_text)
     return cleaned
 
 
@@ -194,7 +220,7 @@ def parse_pdf_document(
 
     for i, page in enumerate(reader.pages):
         raw = page.extract_text(extraction_mode="layout") or ""
-        txt = strip_page_running_header_footer(raw)
+        txt, _ = strip_page_running_header_footer(raw)
         page_offsets.append((len(full_text), i + 1))
         full_text += txt + "\n"
         pages_text.append((i + 1, txt))
