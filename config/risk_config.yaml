@@ -1,0 +1,55 @@
+# Risk agent configuration
+# Stage C5 — Risk Agent
+# All thresholds and weights are [ENG assumption] unless cited otherwise.
+
+# ── Formula weights ─────────────────────────────────────────────────────────
+# R = w_threat * threat_score + w_weather * weather_score + w_history * history_score
+# Constraint: w_threat + w_weather + w_history must equal 1.0.
+# Source: docs/spec/part4_decision_logic.md §4a-iii and part6_build_spec.md §6d-iv
+weights:
+  threat:  0.70   # [ENG assumption] — disease identity should dominate risk
+  weather: 0.20   # [ENG assumption] — contextual; low because thresholds unverified (I14)
+  history: 0.10   # [ENG assumption] — small; strengthens/weakens on follow-ups
+
+# ── Risk level label thresholds ─────────────────────────────────────────────
+# R < low_upper         → "low"
+# low_upper ≤ R < moderate_upper → "moderate"
+# R >= moderate_upper   → "severe"
+# [ENG assumption — all values to be calibrated once threat table is populated]
+label_thresholds:
+  low_upper:      0.25   # [ENG assumption]
+  moderate_upper: 0.60   # [ENG assumption]
+  # severe: R >= moderate_upper
+
+# ── GAP fallback cap ─────────────────────────────────────────────────────────
+# When threat_source = "GAP_FALLBACK", risk_label is capped at "moderate".
+# Rationale: With the empty threat table, "severe" is unreachable on a first visit
+# (max R = 0.70*0.50 + 0.20*1.0 + 0.10*0.0 = 0.55), so this cap enforces I26 explicitly.
+# Source: plan.md I26, part4_decision_logic.md §4a-ii, part6_build_spec.md §6d-iv
+gap_fallback_label_cap: "moderate"  # [ENG] — cap label; never change risk_score
+
+# ── History score defaults ──────────────────────────────────────────────────
+# No history data exists yet. These are engineering defaults.
+# Source: docs/spec/part4_decision_logic.md §4a-v
+history_scores:
+  first_visit:                    0.0    # [ENG default] — no prior monitoring output
+  persistent_disease:             0.10   # [ENG assumption] — same disease still detected at visit ≥ 2
+  no_disease_at_followup:        -0.05   # [ENG assumption] — slight reduction; uncertain signal
+  other:                          0.0    # [ENG default] — all other monitoring states
+
+# ── Neutral defaults when components are unavailable ────────────────────────
+# [ASSUMPTION] neutral values documented as per scope rules
+unavailable_defaults:
+  weather_score_neutral: 0.0    # [ASSUMPTION] — weather unavailable → no weather contribution
+  history_score_neutral: 0.0    # [ENG] — no history → first_visit default
+
+# ── Uncertainty signal thresholds ────────────────────────────────────────────
+# Uncertainty is SEPARATE from risk (D10). These signals drive escalation only.
+# Source: docs/spec/part4_decision_logic.md §4a-vi, part6_build_spec.md §6d-iv
+uncertainty:
+  confidence_threshold: 0.60    # U1: vision.confidence < this [ENG assumption — to be calibrated]
+  prob_gap_threshold:   0.15    # U2: (top1.prob - top2.prob) < this [ENG assumption — to be calibrated]
+  uncertainty_levels:
+    high_confidence:     0      # 0 uncertainty signals
+    moderate_confidence: 1      # 1 uncertainty signal
+    low_confidence:      2      # 2+ uncertainty signals
