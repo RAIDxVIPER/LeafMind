@@ -256,3 +256,54 @@ class TestRAGIngestion:
         assert "V1" in all_v_tags
         assert "V2" in all_v_tags
         assert "V3" in all_v_tags
+
+    # ------------------------------------------------------------------
+    # KB-CLEANUP guard: page running-header / footer leak (bug fix C3.1)
+    # ------------------------------------------------------------------
+    def test_no_page_header_footer_leak(self, ingested_data):
+        """
+        Assert that NO indexed chunk text contains PDF running-header/footer
+        artefacts.  These were leaking in all crops before the fix in
+        strip_page_running_header_footer().
+
+        Patterns banned from *every* text field of every indexed chunk:
+          1. ``| Page <N>``  – pipe-delimited footer suffix
+          2. ``master document``  – document-type tag in footer line
+          3. ``Regional note`` immediately preceded by non-newline content
+             (indicates the heading was merged into the previous paragraph
+             across a page boundary instead of starting a new line)
+
+        If this test fails, check that strip_page_running_header_footer() in
+        src/rag/ingest.py is called for every page before building full_text.
+        """
+        import re
+
+        chunks, _ = ingested_data
+
+        pat_pipe_page  = re.compile(r"\| Page \d+")
+        pat_master_doc = re.compile(r"master document", re.IGNORECASE)
+        # "Regional note" embedded mid-line (not at line start / after newline)
+        pat_regional_note_embedded = re.compile(r"(?<!\n)(?<!^)Regional note", re.IGNORECASE | re.MULTILINE)
+
+        violations: list[str] = []
+        for chunk in chunks:
+            if not chunk.indexed_for_farmer:
+                continue
+            t = chunk.text
+            if pat_pipe_page.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: contains '| Page N' footer"
+                )
+            if pat_master_doc.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: contains 'master document' footer"
+                )
+            if pat_regional_note_embedded.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: 'Regional note' is mid-line (not own paragraph)"
+                )
+
+        assert not violations, (
+            f"{len(violations)} chunk(s) contain page-header/footer artefacts:\n"
+            + "\n".join(violations[:20])
+        )

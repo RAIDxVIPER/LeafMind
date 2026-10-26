@@ -132,6 +132,35 @@ def map_disease_to_model_class(
     return None
 
 
+# ---------------------------------------------------------------------------
+# Running-header / page-footer patterns that every PDF embeds in the text
+# layer. These must be stripped per page BEFORE building full_text so that
+# they never bleed into section content.
+# Pattern 1 (most crops):  "  Crop diseases - master document | Page N"
+# Pattern 2 (Grape):       "  Grape diseases - combined reference | Compiled … | Page N"
+# Pattern 3 (Cherry):      "Cherry diseases - combined reference          Page N"
+# ---------------------------------------------------------------------------
+_PAGE_FOOTER_RE = re.compile(
+    r"^[ \t]*[^\n]*\bdiseases\b[^\n]*\bPage\s+\d+\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# Ensure "Regional note" always begins on its own line (never mid-sentence).
+_REGIONAL_NOTE_RE = re.compile(
+    r"(?<![\n])(?=Regional note)",
+    re.IGNORECASE,
+)
+
+
+def strip_page_running_header_footer(page_text: str) -> str:
+    """Remove running header/footer lines and normalise 'Regional note' breaks."""
+    # Remove any line matching the footer pattern
+    cleaned = _PAGE_FOOTER_RE.sub("", page_text)
+    # Ensure 'Regional note' starts on a new line (handles page-boundary joins)
+    cleaned = _REGIONAL_NOTE_RE.sub("\n", cleaned)
+    return cleaned
+
+
 def extract_verification_tags(text: str) -> List[str]:
     """Extract verification tags V1, V2, V3, US, -- from text."""
     tags: Set[str] = set()
@@ -164,7 +193,8 @@ def parse_pdf_document(
     page_offsets: List[Tuple[int, int]] = []
 
     for i, page in enumerate(reader.pages):
-        txt = page.extract_text(extraction_mode="layout") or ""
+        raw = page.extract_text(extraction_mode="layout") or ""
+        txt = strip_page_running_header_footer(raw)
         page_offsets.append((len(full_text), i + 1))
         full_text += txt + "\n"
         pages_text.append((i + 1, txt))
