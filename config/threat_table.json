@@ -1,5 +1,5 @@
 {
-  "_note": "Disease threat tier for risk scoring. All entries are [GAP] \u2014 a plant pathologist must assign tiers before non-fallback risk scoring is possible. See plan.md I19. Until filled, scorer.py uses DISEASE_DETECTED fallback (0.50). Valid tiers: HEALTHY | LOW | MEDIUM | HIGH | DISEASE_DETECTED",
+  "_note": "Disease threat tier for risk scoring. 15 of 18 disease classes have KB-derived tiers (all UNVERIFIED pending pathologist sign-off); Cedar apple rust, Esca, and Squash powdery mildew remain [GAP]. See plan.md I19, I26 and docs/review/threat_table_draft.md. Valid tiers: HEALTHY | LOW | MEDIUM | HIGH | DISEASE_DETECTED",
   "_tier_scores": {
     "HEALTHY": 0.0,
     "LOW": 0.25,
@@ -7,17 +7,19 @@
     "HIGH": 0.85,
     "DISEASE_DETECTED": 0.5
   },
-  "_tier_scores_note": "[ENG assumption] \u2014 all values to be calibrated by plant pathologist.",
+  "_tier_scores_note": "[ENG assumption] — all values to be calibrated by plant pathologist.",
   "classes": {
     "Apple___Apple_scab": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (HIGH) approved pending human pathologist sign-off (I19). Up to 100% loss without control."
     },
     "Apple___Cedar_apple_rust": {
       "tier": "DISEASE_DETECTED",
       "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "Retained as GAP pending pathologist review; non-reinfecting single-cycle on apple with no Indian reports."
     },
     "Apple___healthy": {
       "tier": "HEALTHY",
@@ -40,29 +42,34 @@
       "notes": "Marked as healthy class by engineering based on class name."
     },
     "Corn___Cercospora_leaf_spot": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Yield-limiting; not national priority."
     },
     "Corn___Common_rust": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Predominant late kharif; leaf tattering."
     },
     "Corn___Northern_Leaf_Blight": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (HIGH) approved pending human pathologist sign-off (I19). 25-90% grain loss in epiphytotics."
     },
     "Grape___Black_rot": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). National significance; mummified berries."
     },
     "Grape___Esca_(Black_Measles)": {
       "tier": "DISEASE_DETECTED",
       "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "Retained as GAP; manual notes economic impact is difficult to measure and zero Indian loss data found."
     },
     "Grape___healthy": {
       "tier": "HEALTHY",
@@ -75,9 +82,10 @@
       "notes": "Marked as healthy class by engineering based on class name."
     },
     "Pepper,_bell___Bacterial_spot": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Main bacterial disease; defoliation & scabby fruit."
     },
     "Pepper,_bell___healthy": {
       "tier": "HEALTHY",
@@ -85,14 +93,16 @@
       "notes": "Marked as healthy class by engineering based on class name."
     },
     "Potato___Early_blight": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Dents tuber quality; mainly senescing plants."
     },
     "Potato___Late_blight": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (HIGH) approved pending human pathologist sign-off (I19). Most destructive potato disease; 11-74% loss."
     },
     "Potato___healthy": {
       "tier": "HEALTHY",
@@ -112,7 +122,8 @@
     "Squash___Powdery_mildew": {
       "tier": "DISEASE_DETECTED",
       "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "Retained as GAP; no KB chapter in data/knowledge_base/."
     },
     "Strawberry___healthy": {
       "tier": "HEALTHY",
@@ -120,39 +131,46 @@
       "notes": "Marked as healthy class by engineering based on class name."
     },
     "Tomato___Bacterial_spot": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Older leaf defoliation and scabby fruit spots."
     },
     "Tomato___Early_blight": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). 2nd most serious tomato disease; fruit rot."
     },
     "Tomato___Late_blight": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (HIGH) approved pending human pathologist sign-off (I19). Fast-spreading blight; up to 79.5% loss."
     },
     "Tomato___Leaf_Mold": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "LOW",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (LOW) approved pending human pathologist sign-off (I19). Primarily polyhouse issue; fruit lesions uncommon."
     },
     "Tomato___Septoria_leaf_spot": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "MEDIUM",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (MEDIUM) approved pending human pathologist sign-off (I19). Severe defoliation; fruit rarely infected."
     },
     "Tomato___Tomato_Yellow_Leaf_Curl_Virus": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "KB draft tier (HIGH) approved pending human pathologist sign-off (I19). Incurable vector-borne; up to 83% incidence."
     },
     "Tomato___Tomato_mosaic_virus": {
-      "tier": "DISEASE_DETECTED",
-      "status": "[GAP]",
-      "notes": "Pathologist review required. Fallback tier used."
+      "tier": "HIGH",
+      "status": "UNVERIFIED_PENDING_PATHOLOGIST",
+      "source": "KB-derived draft, docs/review/threat_table_draft.md",
+      "notes": "Reviewer judgement call; incurable viral infection with severe shoestring and deformed fruit (I19)."
     },
     "Tomato___healthy": {
       "tier": "HEALTHY",

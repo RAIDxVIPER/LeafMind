@@ -23,8 +23,8 @@ def test_threat_table_healthy_classes():
             assert info["tier"] == "HEALTHY", f"Class {cls_name} must be HEALTHY"
             assert info["status"] == "[ENG]"
         else:
-            assert info["tier"] == "DISEASE_DETECTED"
-            assert info["status"] == "[GAP]"
+            assert info["tier"] in ("HIGH", "MEDIUM", "LOW", "DISEASE_DETECTED")
+            assert info["status"] in ("UNVERIFIED_PENDING_PATHOLOGIST", "[GAP]")
 
 @pytest.fixture(scope="module")
 def manifests():

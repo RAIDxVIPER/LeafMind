@@ -93,43 +93,51 @@ def print_result(case_name: str, result) -> None:
 
 
 def main() -> None:
-    print("LeafMind Risk Agent — Smoke Test (Stage C5)")
+    print("LeafMind Risk Agent — Smoke Test (Stage C5, Approved Threat Table)")
     print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
 
     agent = RiskAgent()
     print(f"\nWeights loaded from config: {agent.weights}")
 
-    # ── Case 1: Tomato Late blight, weather available ──────────────────────────
+    # ── Case 1: Tomato___Late_blight (HIGH tier) ──────────────────────────────
     vision1 = make_vision("Tomato___Late_blight", confidence=0.88, top2_prob=0.08)
-    weather1 = make_weather(available=True, score=0.5)   # partial weather score
+    weather1 = make_weather(available=True, score=0.5)
     rag1 = make_rag(found=True)
     result1 = agent.score(vision1, weather1, rag1, monitoring_disease_status=None)
-    print_result("Tomato___Late_blight (weather available, first visit)", result1)
+    print_result("Tomato___Late_blight [HIGH tier] (weather=0.5, first visit)", result1)
 
-    # ── Case 2: Healthy class ──────────────────────────────────────────────────
-    vision2 = make_vision("Tomato___healthy", confidence=0.91)
-    weather2 = make_weather(available=True, score=0.0)
-    rag2 = make_rag(found=False)
-    result2 = agent.score(vision2, weather2, rag2)
-    print_result("Tomato___healthy (expected: low risk, no escalation)", result2)
+    # ── Case 2: Tomato___Early_blight (MEDIUM tier) ───────────────────────────
+    vision2 = make_vision("Tomato___Early_blight", confidence=0.85, top2_prob=0.05)
+    weather2 = make_weather(available=True, score=0.5)
+    rag2 = make_rag(found=True)
+    result2 = agent.score(vision2, weather2, rag2, monitoring_disease_status=None)
+    print_result("Tomato___Early_blight [MEDIUM tier] (weather=0.5, first visit)", result2)
 
-    # ── Case 3: Squash___Powdery_mildew (no KB chapter) ───────────────────────
-    vision3 = make_vision("Squash___Powdery_mildew", confidence=0.75)
-    weather3 = make_weather(available=True, score=0.0)
-    rag3 = make_rag(found=False, kb_gap=True)
-    result3 = agent.score(vision3, weather3, rag3)
-    print_result("Squash___Powdery_mildew (no KB chapter, GAP_FALLBACK)", result3)
+    # ── Case 3: Tomato___Leaf_Mold (LOW tier) ─────────────────────────────────
+    vision3 = make_vision("Tomato___Leaf_Mold", confidence=0.82, top2_prob=0.06)
+    weather3 = make_weather(available=True, score=0.5)
+    rag3 = make_rag(found=True)
+    result3 = agent.score(vision3, weather3, rag3, monitoring_disease_status=None)
+    print_result("Tomato___Leaf_Mold [LOW tier] (weather=0.5, first visit)", result3)
 
-    # ── Case 4: Weather unavailable ───────────────────────────────────────────
-    vision4 = make_vision("Tomato___Early_blight", confidence=0.82)
-    weather4 = make_weather(available=False)
+    # ── Case 4: Apple___Cedar_apple_rust (STAY GAP fallback) ─────────────────
+    vision4 = make_vision("Apple___Cedar_apple_rust", confidence=0.80, top2_prob=0.10)
+    weather4 = make_weather(available=True, score=0.5)
     rag4 = make_rag(found=True)
-    result4 = agent.score(vision4, weather4, rag4)
-    print_result("Tomato___Early_blight (weather UNAVAILABLE)", result4)
+    result4 = agent.score(vision4, weather4, rag4, monitoring_disease_status=None)
+    print_result("Apple___Cedar_apple_rust [STAY GAP] (weather=0.5, GAP_FALLBACK)", result4)
+
+    # ── Case 5: Tomato___healthy (HEALTHY tier) ───────────────────────────────
+    vision5 = make_vision("Tomato___healthy", confidence=0.91)
+    weather5 = make_weather(available=True, score=0.0)
+    rag5 = make_rag(found=False)
+    result5 = agent.score(vision5, weather5, rag5, monitoring_disease_status=None)
+    print_result("Tomato___healthy [HEALTHY tier] (weather=0.0, first visit)", result5)
 
     print(f"\n{'='*60}")
-    print("Smoke test complete — all 4 cases produced RiskOutput without crash.")
+    print("Smoke test complete — all 5 cases produced RiskOutput without crash.")
     print(f"{'='*60}")
+
 
 
 if __name__ == "__main__":

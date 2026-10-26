@@ -150,11 +150,12 @@ class TestFormulaCorrectness:
 
     def test_case_1b_gap_fallback_with_weather(self, agent: RiskAgent) -> None:
         """
-        Case 1b from spec: confident Late blight + W01 triggered, empty threat table.
+        Case 1b from spec: confident disease in GAP fallback + W01 triggered.
+        Uses Apple___Cedar_apple_rust (stay GAP).
         R = 0.70*0.50 + 0.20*1.0 + 0.10*0.0 = 0.350 + 0.200 + 0.000 = 0.550 → "moderate"
         Source: docs/spec/part4_decision_logic.md §4a-ix Case 1b [ILLUSTRATIVE]
         """
-        vision = _make_vision("Tomato___Late_blight", confidence=0.88, top2_prob=0.08)
+        vision = _make_vision("Apple___Cedar_apple_rust", confidence=0.88, top2_prob=0.08)
         weather = _make_weather(available=True, weather_score=1.0)  # W01 triggered
         rag = _make_rag(found=True)
 
@@ -257,9 +258,10 @@ class TestFormulaCorrectness:
     def test_formula_with_positive_history(self, agent: RiskAgent) -> None:
         """
         Persistent disease on follow-up: history_score = 0.10
+        Uses Tomato___Early_blight (MEDIUM tier, threat=0.50).
         R = 0.70*0.50 + 0.20*0.0 + 0.10*0.10 = 0.35 + 0.0 + 0.01 = 0.36
         """
-        vision = _make_vision("Tomato___Late_blight", confidence=0.80)
+        vision = _make_vision("Tomato___Early_blight", confidence=0.80)
         weather = _make_weather(available=True, weather_score=0.0)
         rag = _make_rag(found=True)
 
@@ -276,9 +278,10 @@ class TestFormulaCorrectness:
     def test_formula_with_negative_history(self, agent: RiskAgent) -> None:
         """
         No disease at follow-up: history_score = -0.05
+        Uses Tomato___Early_blight (MEDIUM tier, threat=0.50).
         R = 0.70*0.50 + 0.20*0.0 + 0.10*(-0.05) = 0.35 - 0.005 = 0.345
         """
-        vision = _make_vision("Tomato___Late_blight", confidence=0.80)
+        vision = _make_vision("Tomato___Early_blight", confidence=0.80)
         weather = _make_weather(available=True, weather_score=0.0)
         rag = _make_rag(found=True)
 
@@ -299,11 +302,12 @@ class TestGAPFallback:
     def test_gap_fallback_threat_score_is_0_50(
         self, threat_table: ThreatTable
     ) -> None:
-        """All current disease classes should return GAP_FALLBACK with score=0.50 (I19)."""
-        result = threat_table.lookup("Tomato___Late_blight")
-        assert result.is_gap is True
-        assert result.threat_source == "GAP_FALLBACK"
-        assert abs(result.threat_score - 0.50) < 1e-9
+        """GAP disease classes should return GAP_FALLBACK with score=0.50 (I19)."""
+        for gap_cls in ("Apple___Cedar_apple_rust", "Grape___Esca_(Black_Measles)", "Squash___Powdery_mildew"):
+            result = threat_table.lookup(gap_cls)
+            assert result.is_gap is True
+            assert result.threat_source == "GAP_FALLBACK"
+            assert abs(result.threat_score - 0.50) < 1e-9
 
     def test_gap_fallback_caps_label_at_moderate(self, agent: RiskAgent) -> None:
         """
@@ -311,7 +315,7 @@ class TestGAPFallback:
         R = 0.70*0.50 + 0.20*1.0 + 0.10*0.10 = 0.35 + 0.20 + 0.01 = 0.56 → would be
         'moderate' anyway (< 0.60), but cap is still enforced to prevent edge cases.
         """
-        vision = _make_vision("Tomato___Late_blight", confidence=0.92)
+        vision = _make_vision("Apple___Cedar_apple_rust", confidence=0.92)
         weather = _make_weather(available=True, weather_score=1.0)
         rag = _make_rag(found=True)
 
@@ -328,7 +332,7 @@ class TestGAPFallback:
 
     def test_gap_fallback_does_not_change_risk_score(self, agent: RiskAgent) -> None:
         """GAP cap must only affect the label, not risk_score itself."""
-        vision = _make_vision("Tomato___Late_blight", confidence=0.92)
+        vision = _make_vision("Apple___Cedar_apple_rust", confidence=0.92)
         weather = _make_weather(available=True, weather_score=1.0)
         rag = _make_rag(found=True)
 
@@ -469,13 +473,13 @@ class TestMissingHistory:
 
     def test_first_visit_no_history_uses_zero(self, agent: RiskAgent) -> None:
         """First visit (monitoring_disease_status=None) must use history_score=0.0."""
-        vision = _make_vision("Tomato___Late_blight", confidence=0.85)
+        vision = _make_vision("Tomato___Early_blight", confidence=0.85)
         weather = _make_weather(available=True, weather_score=0.0)
         rag = _make_rag(found=True)
 
         result = agent.score(vision, weather, rag, monitoring_disease_status=None)
 
-        # R = 0.70*0.50 + 0.20*0.0 + 0.10*0.0 = 0.35
+        # R = 0.70*0.50 + 0.20*0.0 + 0.10*0.0 = 0.35 (Tomato___Early_blight threat=0.50)
         expected = 0.70 * 0.50
         assert abs(result.risk_score - expected) < 1e-6
 
@@ -723,3 +727,177 @@ class TestThreatTable:
         assert result.is_gap is True
         assert result.threat_source == "GAP_FALLBACK"
         assert abs(result.threat_score - 0.50) < 1e-9
+
+
+# ── Test: Approved Threat Table (I19 Partial) ────────────────────────────────
+
+class TestApprovedThreatTable:
+    """
+    Tests for the approved threat table tiers (I19 partial).
+    Validates:
+      1. All 17 mapped classes present with exact approved tiers
+      2. The 3 GAP rows return GAP_FALLBACK and are capped at moderate
+      3. A HIGH row can reach "severe" with high weather/history inputs
+      4. MEDIUM/LOW rows are not capped (is_gap is False)
+      5. Healthy rows unchanged (tier HEALTHY, threat_score 0.0)
+      6. Loader still works and returns all rows
+    """
+
+    APPROVED_TIERS = {
+        # HIGH (6)
+        "Apple___Apple_scab": ("HIGH", 0.85, False),
+        "Corn___Northern_Leaf_Blight": ("HIGH", 0.85, False),
+        "Potato___Late_blight": ("HIGH", 0.85, False),
+        "Tomato___Late_blight": ("HIGH", 0.85, False),
+        "Tomato___Tomato_Yellow_Leaf_Curl_Virus": ("HIGH", 0.85, False),
+        "Tomato___Tomato_mosaic_virus": ("HIGH", 0.85, False),
+        # MEDIUM (8)
+        "Corn___Common_rust": ("MEDIUM", 0.50, False),
+        "Corn___Cercospora_leaf_spot": ("MEDIUM", 0.50, False),
+        "Grape___Black_rot": ("MEDIUM", 0.50, False),
+        "Pepper,_bell___Bacterial_spot": ("MEDIUM", 0.50, False),
+        "Potato___Early_blight": ("MEDIUM", 0.50, False),
+        "Tomato___Early_blight": ("MEDIUM", 0.50, False),
+        "Tomato___Septoria_leaf_spot": ("MEDIUM", 0.50, False),
+        "Tomato___Bacterial_spot": ("MEDIUM", 0.50, False),
+        # LOW (1)
+        "Tomato___Leaf_Mold": ("LOW", 0.25, False),
+        # STAY GAP (3)
+        "Apple___Cedar_apple_rust": ("DISEASE_DETECTED", 0.50, True),
+        "Grape___Esca_(Black_Measles)": ("DISEASE_DETECTED", 0.50, True),
+        "Squash___Powdery_mildew": ("DISEASE_DETECTED", 0.50, True),
+    }
+
+    def test_all_17_mapped_classes_present_and_match_tiers(
+        self, threat_table: ThreatTable
+    ) -> None:
+        """All 17 mapped classes (+ Squash) must match approved tiers exactly."""
+        for model_class, (expected_tier, expected_score, expected_gap) in self.APPROVED_TIERS.items():
+            result = threat_table.lookup(model_class)
+            assert result.tier == expected_tier, (
+                f"{model_class}: expected tier {expected_tier}, got {result.tier}"
+            )
+            assert abs(result.threat_score - expected_score) < 1e-6, (
+                f"{model_class}: expected threat_score {expected_score}, got {result.threat_score}"
+            )
+            assert result.is_gap == expected_gap, (
+                f"{model_class}: expected is_gap={expected_gap}, got {result.is_gap}"
+            )
+            if expected_gap:
+                assert result.threat_source == "GAP_FALLBACK"
+            else:
+                assert result.threat_source == "threat_table"
+
+    def test_three_gap_rows_use_gap_fallback_and_cap_at_moderate(
+        self, agent: RiskAgent
+    ) -> None:
+        """
+        The 3 GAP rows (Cedar apple rust, Esca, Squash powdery mildew) must
+        use GAP_FALLBACK and be capped at 'moderate' even with high weather and history.
+        """
+        gap_classes = [
+            "Apple___Cedar_apple_rust",
+            "Grape___Esca_(Black_Measles)",
+            "Squash___Powdery_mildew",
+        ]
+        for cls_name in gap_classes:
+            vision = _make_vision(cls_name, confidence=0.95)
+            # High weather and positive history:
+            # R = 0.70*0.50 + 0.20*1.0 + 0.10*0.10 = 0.35 + 0.20 + 0.01 = 0.56
+            weather = _make_weather(available=True, weather_score=1.0)
+            rag = _make_rag(found=True)
+            result = agent.score(
+                vision, weather, rag,
+                monitoring_disease_status="same_disease_still_detected"
+            )
+            assert result.risk_level in ("low", "moderate"), (
+                f"{cls_name} (GAP) must not exceed 'moderate', got {result.risk_level}"
+            )
+            assert result.risk_level != "severe"
+            # Threat factor source must be threat_table with GAP_FALLBACK note or GAP_FALLBACK
+            threat_factor = [f for f in result.factors if f.source in ("threat_table", "GAP_FALLBACK")][0]
+            assert "GAP_FALLBACK" in threat_factor.value or threat_factor.source == "threat_table"
+
+    def test_high_rows_can_reach_severe(self, agent: RiskAgent) -> None:
+        """
+        HIGH tier rows can reach 'severe' (risk_score >= 0.60) with high weather/history.
+        Formula: R = 0.70*0.85 + 0.20*0.50 + 0.10*0.0 = 0.595 + 0.10 = 0.695 >= 0.60
+        """
+        high_classes = [
+            "Apple___Apple_scab",
+            "Corn___Northern_Leaf_Blight",
+            "Potato___Late_blight",
+            "Tomato___Late_blight",
+            "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+            "Tomato___Tomato_mosaic_virus",
+        ]
+        for cls_name in high_classes:
+            vision = _make_vision(cls_name, confidence=0.90)
+            weather = _make_weather(available=True, weather_score=0.50)
+            rag = _make_rag(found=True)
+            result = agent.score(vision, weather, rag, monitoring_disease_status=None)
+            # R = 0.70*0.85 + 0.20*0.50 + 0.10*0.0 = 0.695 -> "severe"
+            assert abs(result.risk_score - 0.695) < 1e-4, (
+                f"{cls_name}: expected 0.695, got {result.risk_score}"
+            )
+            assert result.risk_level == "severe", (
+                f"{cls_name} should reach 'severe', got {result.risk_level}"
+            )
+
+    def test_medium_and_low_rows_are_not_capped(
+        self, threat_table: ThreatTable
+    ) -> None:
+        """MEDIUM and LOW rows must have is_gap=False and source='threat_table' (uncapped)."""
+        medium_and_low = [
+            "Corn___Common_rust",
+            "Corn___Cercospora_leaf_spot",
+            "Grape___Black_rot",
+            "Pepper,_bell___Bacterial_spot",
+            "Potato___Early_blight",
+            "Tomato___Early_blight",
+            "Tomato___Septoria_leaf_spot",
+            "Tomato___Bacterial_spot",
+            "Tomato___Leaf_Mold",
+        ]
+        for cls_name in medium_and_low:
+            result = threat_table.lookup(cls_name)
+            assert result.is_gap is False, f"{cls_name} must not be flagged as gap"
+            assert result.threat_source == "threat_table"
+
+    def test_healthy_rows_unchanged(self, threat_table: ThreatTable) -> None:
+        """All 12 healthy classes must have tier HEALTHY, threat_score 0.0, is_gap False."""
+        healthy_classes = [
+            "Apple___healthy",
+            "Blueberry___healthy",
+            "Cherry_(including_sour)___healthy",
+            "Corn_(maize)___healthy",
+            "Grape___healthy",
+            "Peach___healthy",
+            "Pepper,_bell___healthy",
+            "Potato___healthy",
+            "Raspberry___healthy",
+            "Soybean___healthy",
+            "Strawberry___healthy",
+            "Tomato___healthy",
+        ]
+        for cls_name in healthy_classes:
+            result = threat_table.lookup(cls_name)
+            assert result.threat_score == 0.0
+            assert result.tier == "HEALTHY"
+            assert result.is_gap is False
+            assert result.threat_source == "HEALTHY"
+
+    def test_loader_still_works(self) -> None:
+        """ThreatTable loader loads all 30 rows and parses metadata correctly."""
+        table = ThreatTable()
+        table.load()
+        assert len(table._classes) == 30
+        assert table.tier_scores["HIGH"] == 0.85
+        assert table.tier_scores["MEDIUM"] == 0.50
+        assert table.tier_scores["LOW"] == 0.25
+        # Check an unverified row has the unverified status
+        row = table._classes["Tomato___Late_blight"]
+        assert row["status"] == "UNVERIFIED_PENDING_PATHOLOGIST"
+        assert "docs/review/threat_table_draft.md" in row.get("source", "")
+
+
