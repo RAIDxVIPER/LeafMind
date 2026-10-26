@@ -188,6 +188,7 @@ class WeatherAgent:
                 is_stale=False,
                 is_cache_hit=False,
                 diagnosed_disease=disease,
+                query_datetime=query_datetime,
             )
 
             # Store in cache
@@ -234,23 +235,31 @@ class WeatherAgent:
         is_stale: bool,
         is_cache_hit: bool,
         diagnosed_disease: Optional[str] = None,
+        query_datetime: Optional[datetime] = None,
     ) -> WeatherOutput:
         """Evaluate rules, summary statistics, and construct final WeatherOutput."""
         hourly = fetched_data.get("hourly_data") or {}
+        raw_resp = fetched_data.get("raw_response", {})
+        current_block = raw_resp.get("current", {}) if isinstance(raw_resp, dict) else {}
+        current_time_str = current_block.get("time")
 
-        # Compute summary statistics
+        # Compute summary statistics on historical past window (excluding future forecast)
         stats: WeatherSummaryStats = self.rule_engine.compute_summary_statistics(
             hourly_data=hourly,
             rh_threshold_pct=self.rh_threshold_pct,
             precip_threshold_mm=self.precip_threshold_mm,
+            current_time_str=current_time_str,
+            query_datetime=query_datetime,
         )
 
-        # Evaluate disease-favourable condition rules W01–W08
+        # Evaluate disease-favourable condition rules W01–W08 over past 24h ending at current time
         rule_results: List[RuleTriggerResult] = self.rule_engine.evaluate_rules(
             hourly_data=hourly,
             summary_stats=stats,
             rh_threshold_pct=self.rh_threshold_pct,
             precip_threshold_mm=self.precip_threshold_mm,
+            current_time_str=current_time_str,
+            query_datetime=query_datetime,
         )
 
         # Legacy risk flags

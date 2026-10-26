@@ -18,6 +18,7 @@ Provenance and rules:
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,20 +50,79 @@ class WeatherRuleEngine:
             logger.warning("Rules file %s not found; using empty rules list", cfg_file)
             self.rules_config = []
 
+    def _isolate_past_24h_window(
+        self,
+        hourly_data: Dict[str, List[Any]],
+        current_time_str: Optional[str] = None,
+        query_datetime: Optional[datetime] = None,
+    ) -> Tuple[int, int]:
+        """
+        Determine [start_idx, end_idx) corresponding strictly to the 24 hours ending at current time.
+        Guarantees that forecast hours are never included, and that the window represents the
+        rolling 24-hour period up to the current observation time (not a calendar day).
+        """
+        times = [str(t) for t in hourly_data.get("time", []) if t is not None]
+        ref_len = len(times)
+        if ref_len == 0:
+            for k in ("temperature_2m", "relative_humidity_2m", "precipitation"):
+                if k in hourly_data and hourly_data[k]:
+                    ref_len = len(hourly_data[k])
+                    break
+
+        if ref_len <= 24:
+            return 0, ref_len
+
+        # When timestamps are present and length > 24:
+        if times and len(times) == ref_len:
+            curr_target = current_time_str
+            if not curr_target and query_datetime:
+                curr_target = query_datetime.isoformat()
+
+            if curr_target:
+                matching = [i for i, t in enumerate(times) if str(t) <= str(curr_target)]
+                curr_idx = matching[-1] if matching else 0
+            else:
+                now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:00")
+                matching = [i for i, t in enumerate(times) if str(t) <= now_utc]
+                if not matching:
+                    now_local = datetime.now().strftime("%Y-%m-%dT%H:00")
+                    matching = [i for i, t in enumerate(times) if str(t) <= now_local]
+                curr_idx = matching[-1] if matching else min(168, len(times) - 1)
+
+            start_idx = max(0, curr_idx - 23)
+            end_idx = curr_idx + 1
+            return start_idx, end_idx
+
+        # If no timestamps provided but length > 24: take last 24
+        return max(0, ref_len - 24), ref_len
+
     def compute_summary_statistics(
         self,
         hourly_data: Dict[str, List[Any]],
         rh_threshold_pct: float = 90.0,
         precip_threshold_mm: float = 0.1,
+        current_time_str: Optional[str] = None,
+        query_datetime: Optional[datetime] = None,
     ) -> WeatherSummaryStats:
         """
         Compute aggregate summary statistics from hourly weather data.
         Derives leaf-wetness proxy tagged [ENG proxy].
+        When a full time series with timestamps is provided, computes over historical past window up to current time.
         """
-        temps = [float(v) for v in hourly_data.get("temperature_2m", []) if v is not None]
-        rhs = [float(v) for v in hourly_data.get("relative_humidity_2m", []) if v is not None]
-        precips = [float(v) for v in hourly_data.get("precipitation", []) if v is not None]
-        winds = [float(v) for v in hourly_data.get("wind_speed_10m", []) if v is not None]
+        times = [str(t) for t in hourly_data.get("time", []) if t is not None]
+        if times and len(times) > 24:
+            _, end_idx = self._isolate_past_24h_window(
+                hourly_data, current_time_str=current_time_str, query_datetime=query_datetime
+            )
+            # Use past data up to the current hour (excludes future forecast)
+            data_slice = {k: v[:end_idx] if isinstance(v, list) else v for k, v in hourly_data.items()}
+        else:
+            data_slice = hourly_data
+
+        temps = [float(v) for v in data_slice.get("temperature_2m", []) if v is not None]
+        rhs = [float(v) for v in data_slice.get("relative_humidity_2m", []) if v is not None]
+        precips = [float(v) for v in data_slice.get("precipitation", []) if v is not None]
+        winds = [float(v) for v in data_slice.get("wind_speed_10m", []) if v is not None]
 
         mean_temp = sum(temps) / len(temps) if temps else 0.0
         max_temp = max(temps) if temps else 0.0
@@ -107,30 +167,39 @@ class WeatherRuleEngine:
         summary_stats: Optional[WeatherSummaryStats] = None,
         rh_threshold_pct: float = 90.0,
         precip_threshold_mm: float = 0.1,
+        current_time_str: Optional[str] = None,
+        query_datetime: Optional[datetime] = None,
     ) -> List[RuleTriggerResult]:
         """
-        Evaluate rules W01–W08 over the past 24 hours of data.
+        Evaluate rules W01–W08 over the past 24 hours of data ending at current time.
+        Never includes forecast hours; represents the rolling 24-hour period (not a calendar day).
         Returns a structured RuleTriggerResult for each rule.
         """
         if summary_stats is None:
             summary_stats = self.compute_summary_statistics(
-                hourly_data, rh_threshold_pct, precip_threshold_mm
+                hourly_data,
+                rh_threshold_pct,
+                precip_threshold_mm,
+                current_time_str=current_time_str,
+                query_datetime=query_datetime,
             )
 
-        # Isolate the most recent 24 hours for evaluation
-        temps = [float(v) for v in hourly_data.get("temperature_2m", []) if v is not None]
-        rhs = [float(v) for v in hourly_data.get("relative_humidity_2m", []) if v is not None]
-        precips = [float(v) for v in hourly_data.get("precipitation", []) if v is not None]
-        winds = [float(v) for v in hourly_data.get("wind_speed_10m", []) if v is not None]
-        dew_points = [float(v) for v in hourly_data.get("dew_point_2m", []) if v is not None]
+        # Isolate exactly the past 24 hours ending at current observation time
+        start_idx, end_idx = self._isolate_past_24h_window(
+            hourly_data, current_time_str=current_time_str, query_datetime=query_datetime
+        )
 
-        # Use last 24 hours if available, otherwise entire series
-        window_size = min(24, len(temps))
-        w_temps = temps[-window_size:] if temps else []
-        w_rhs = rhs[-window_size:] if rhs else []
-        w_precips = precips[-window_size:] if precips else []
-        w_winds = winds[-window_size:] if winds else []
-        w_dews = dew_points[-window_size:] if dew_points else []
+        raw_temps = hourly_data.get("temperature_2m", [])[start_idx:end_idx]
+        raw_rhs = hourly_data.get("relative_humidity_2m", [])[start_idx:end_idx]
+        raw_precips = hourly_data.get("precipitation", [])[start_idx:end_idx]
+        raw_winds = hourly_data.get("wind_speed_10m", [])[start_idx:end_idx]
+        raw_dews = hourly_data.get("dew_point_2m", [])[start_idx:end_idx]
+
+        w_temps = [float(v) for v in raw_temps if v is not None]
+        w_rhs = [float(v) for v in raw_rhs if v is not None]
+        w_precips = [float(v) for v in raw_precips if v is not None]
+        w_winds = [float(v) for v in raw_winds if v is not None]
+        w_dews = [float(v) if v is not None else None for v in raw_dews]
 
         w_min_temp = min(w_temps) if w_temps else 0.0
         w_max_temp = max(w_temps) if w_temps else 0.0
@@ -255,14 +324,18 @@ class WeatherRuleEngine:
                 diffs = [
                     abs(w_dews[i] - w_temps[i])
                     for i in range(n_dp)
-                    if float(t_low) <= w_temps[i] <= float(t_high)
+                    if w_dews[i] is not None and float(t_low) <= w_temps[i] <= float(t_high)
                 ]
-                min_diff = min(diffs) if diffs else 999.0
-                triggered = min_diff <= dp_diff_max
-                if triggered:
-                    measured_str = f"temp in [{t_low}, {t_high}]°C, dew_point_diff={min_diff:.1f}°C <= {dp_diff_max}°C"
+                if diffs:
+                    min_diff = min(diffs)
+                    triggered = min_diff <= dp_diff_max
+                    if triggered:
+                        measured_str = f"temp in [{t_low}, {t_high}]°C, dew_point_diff={min_diff:.1f}°C <= {dp_diff_max}°C"
+                    else:
+                        measured_str = f"temp_range=[{w_min_temp:.1f}, {w_max_temp:.1f}]°C, min_dew_point_diff={min_diff:.1f}°C"
                 else:
-                    measured_str = f"temp_range=[{w_min_temp:.1f}, {w_max_temp:.1f}]°C, min_dew_point_diff={min_diff:.1f}°C"
+                    triggered = False
+                    measured_str = f"temp_range=[{w_min_temp:.1f}, {w_max_temp:.1f}]°C, min_dew_point_diff=null"
 
             elif r_id == "W08":
                 # General epidemic risk: precipitation_sum > 10mm in last 24h [GAP]

@@ -1,5 +1,5 @@
 # LeafMind Weather Disease-Risk Rules (W01–W08)
-# Sourced from spec: docs/spec/part2_ml_knowledge.md §2c-v and docs/spec/part6_build_spec.md §6d-v
+# Sourced from spec: docs/spec/part6_build_spec.md §6d-v and docs/spec/part2_ml_knowledge.md §2c-v
 # IMPORTANT: All rule thresholds are [UNVERIFIED — I14] and require plant pathologist validation.
 # W08 is a general agronomic heuristic without peer-reviewed citation [GAP] and is excluded from active scoring per spec Part 6 §6d-v.
 
@@ -11,7 +11,7 @@ rules:
       - "Tomato___Late_blight"
       - "Potato___Late_blight"
     threshold_expression: "RH > 90% AND temp_min < 18°C [UNVERIFIED — I14]"
-    threshold_source: "Fry, W.E. (1977) — Phytophthora infestans epidemiology [UNVERIFIED — I14]"
+    threshold_source: "Fry (1977) [UNVERIFIED — I14]"
     time_window: "past_24h"
     criteria:
       rh_min: 90.0        # RH > 90%
@@ -27,7 +27,7 @@ rules:
       - "Peach___Powdery_mildew"
       - "Grape___Powdery_mildew"
     threshold_expression: "RH < 50% AND temp 20–30°C [UNVERIFIED — I14]"
-    threshold_source: "Yarwood, C.E. (1957) — Powdery mildew biology [UNVERIFIED — I14]"
+    threshold_source: "Yarwood (1957) [UNVERIFIED — I14]"
     time_window: "past_24h"
     criteria:
       rh_max: 50.0
@@ -55,7 +55,7 @@ rules:
       - "Tomato___Early_blight"
       - "Potato___Early_blight"
     threshold_expression: "temp > 24°C AND (precip_hours > 2 OR leaf_wetness_proxy > 2h) [UNVERIFIED — I14]"
-    threshold_source: "Jones & Jones (1974) — Alternaria epidemiology [UNVERIFIED — I14]"
+    threshold_source: "Jones & Jones (1974) [UNVERIFIED — I14]"
     time_window: "past_24h"
     criteria:
       temp_min: 24.0
@@ -80,7 +80,7 @@ rules:
     applicable_classes:
       - "Tomato___Tomato_Yellow_Leaf_Curl_Virus"
     threshold_expression: "temp > 28°C AND RH < 40% [UNVERIFIED — I14]"
-    threshold_source: "Byrne & Brown (1996) — Bemisia tabaci activity [UNVERIFIED — I14]"
+    threshold_source: "Byrne & Brown (1996) [UNVERIFIED — I14]"
     time_window: "past_24h"
     criteria:
       temp_min: 28.0
@@ -104,7 +104,7 @@ rules:
     disease: "General epidemic risk"
     applicable_classes: []
     threshold_expression: "precipitation_sum > 10mm in last 24h [GAP — unverified heuristic]"
-    threshold_source: "[GAP] General agronomic heuristic — no peer-reviewed citation; omitted from production scoring per spec Part 6 §6d-v"
+    threshold_source: "[GAP] General agronomic heuristic [UNVERIFIED — I14]"
     time_window: "past_24h"
     omitted_from_scoring: true  # per Part 4 §4a-iv & Part 6 §6d-v
     criteria:
