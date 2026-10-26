@@ -61,7 +61,7 @@ def run_live_smoke() -> WeatherOutput:
 
     if output.summary_statistics:
         st = output.summary_statistics
-        print(f"\nSummary Statistics (past window):")
+        print(f"\nSummary Statistics (past 24h window):")
         print(f"  - Mean Temp: {st.mean_temperature_c} deg C (min: {st.min_temperature_c} deg C, max: {st.max_temperature_c} deg C)")
         print(f"  - Mean RH: {st.mean_relative_humidity_pct}% (min: {st.min_relative_humidity_pct}%, max: {st.max_relative_humidity_pct}%)")
         print(f"  - Total Precipitation: {st.total_precipitation_mm} mm over {st.precipitation_hours} hours")

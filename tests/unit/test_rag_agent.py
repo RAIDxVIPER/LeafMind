@@ -283,3 +283,70 @@ class TestRAGAgent:
         assert "urea" not in ro_apple.what_to_do_first.lower()
         assert "time sprays" not in ro_apple.what_to_do_first.lower()
         assert "restrict the number of applications" in ro_apple.what_to_do_first.lower()
+
+    def test_no_dangling_because_sentences_when_doses_scrubbed(self, agent):
+        """
+        Verify that when include_doses=False, no narrative field contains a sentence
+        starting with 'Because' that lacks a main action after the comma.
+        Ensures chemical sentence drops do not leave dangling subordinate clauses.
+        """
+        import re
+
+        mapped_classes = [
+            ("Apple___Apple_scab", "Apple"),
+            ("Apple___Cedar_apple_rust", "Apple"),
+            ("Grape___Black_rot", "Grape"),
+            ("Grape___Esca_(Black_Measles)", "Grape"),
+            ("Corn___Northern_Leaf_Blight", "Corn"),
+            ("Corn___Common_rust", "Corn"),
+            ("Corn___Cercospora_leaf_spot", "Corn"),
+            ("Tomato___Early_blight", "Tomato"),
+            ("Tomato___Late_blight", "Tomato"),
+            ("Tomato___Septoria_leaf_spot", "Tomato"),
+            ("Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato"),
+            ("Tomato___Bacterial_spot", "Tomato"),
+            ("Tomato___Leaf_Mold", "Tomato"),
+            ("Tomato___Tomato_mosaic_virus", "Tomato"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
+        ]
+
+        fields = [
+            "what_it_is",
+            "why_it_happens",
+            "what_to_do_first",
+            "prevention",
+            "look_alikes",
+            "favourable_conditions",
+        ]
+
+        # Valid action verb pattern for main clauses
+        action_verbs = re.compile(
+            r"\b(is|are|was|were|helps?|speeds?|reduces?|prevents?|remov\w+|clear\w+|bury\w+|protects?|causes?|provides?|should|must|can)\b",
+            re.I,
+        )
+
+        for model_class, crop in mapped_classes:
+            ro = agent.query_candidate(model_class, crop=crop, include_doses=False)
+            all_text_blocks = [getattr(ro, f) for f in fields if getattr(ro, f)]
+            all_text_blocks.extend(ro.treatment_options)
+            all_text_blocks.extend(ro.preventive_measures)
+
+            for block in all_text_blocks:
+                # Check each sentence or bullet line
+                for segment in re.split(r"(?<=[.!?\n])\s+", block):
+                    clean_seg = segment.strip().lstrip("•-* \t")
+                    if clean_seg.startswith("Because"):
+                        # Must contain a comma separating subordinate clause
+                        assert "," in clean_seg, f"Sentence starting with 'Because' lacks comma in {model_class}: {clean_seg}"
+                        after_comma = clean_seg.split(",", 1)[1].strip()
+                        # Must have a main action verb after the comma
+                        assert action_verbs.search(after_comma), (
+                            f"Dangling 'Because' fragment with no main action after comma in {model_class}: {clean_seg}"
+                        )
+                        # Must not end abruptly with hanging preposition or conjunction
+                        assert not re.search(r"\b(by|with|of|in|on|at|and|or|for|to)\s*$", after_comma, re.I), (
+                            f"Hanging preposition/conjunction in 'Because' clause in {model_class}: {clean_seg}"
+                        )
+

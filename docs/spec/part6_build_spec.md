@@ -715,6 +715,12 @@ Implement rules W01–W07 only. W08 is excluded (no peer-reviewed citation [GAP]
 
 All thresholds are [UNVERIFIED — I14]. Tag every weather contribution in output.
 
+> [!NOTE]
+> **Evaluation Semantics:**
+> - **Concurrent-hour rules (W02, W06, W05, W07):** Evaluated by counting individual hours where all threshold conditions hold simultaneously at the same hour. This reflects instantaneous microclimatic requirements (e.g., powdery mildew conidial release during warm, dry afternoons; whitefly vector flight activity in hot, dry air).
+> - **24-hour aggregate rules (W01, W03, W04, W08):** Evaluated by combining 24-hour summary aggregates across the rolling 24-hour window ending at current observation time. This reflects diurnal disease cycles where events occur sequentially (e.g., W04 Early blight warm day following morning rain; W03 Bacterial spot rain splash dispersal combined with warm daily temperatures).
+> This distinction between concurrent-hour and 24-hour aggregate evaluation is intended.
+
 ---
 
 ### 6d-vi. Escalation Triggers

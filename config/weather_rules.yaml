@@ -2,6 +2,14 @@
 # Sourced from spec: docs/spec/part6_build_spec.md §6d-v and docs/spec/part2_ml_knowledge.md §2c-v
 # IMPORTANT: All rule thresholds are [UNVERIFIED — I14] and require plant pathologist validation.
 # W08 is a general agronomic heuristic without peer-reviewed citation [GAP] and is excluded from active scoring per spec Part 6 §6d-v.
+#
+# Evaluation semantics note:
+# - Hourly coincidence rules: W02, W06 (and W05, W07) evaluate conditions concurrently at the same hour
+#   (e.g., W02 requires RH < 50% AND temp 20–30°C in the same hour, reflecting instantaneous microclimate requirements).
+# - 24-hour aggregate rules: W01, W03, W04, W08 evaluate aggregate summary statistics over the rolling 24-hour window
+#   (e.g., W04 requires temp_max > 24°C AND precip_hours > 2 across the 24h period, reflecting diurnal post-rain incubation cycles;
+#   W03 requires temp_max > 24°C, precip_sum > 0, and wind_max > 15 km/h across the 24h period, reflecting driving rain splash and warm incubation).
+# This semantic distinction is intended.
 
 rules:
   - id: "W01"
@@ -54,13 +62,13 @@ rules:
     applicable_classes:
       - "Tomato___Early_blight"
       - "Potato___Early_blight"
-    threshold_expression: "temp > 24°C AND (precip_hours > 2 OR leaf_wetness_proxy > 2h) [UNVERIFIED — I14]"
+    threshold_expression: "temp > 24°C AND precip_hours > 2 [UNVERIFIED — I14]"
     threshold_source: "Jones & Jones (1974) [UNVERIFIED — I14]"
     time_window: "past_24h"
     criteria:
       temp_min: 24.0
       precip_hours_min: 2
-      leaf_wetness_hours_min: 2  # [ENG proxy]
+
 
   - id: "W05"
     condition_name: "Septoria leaf spot favourable conditions (W05)"

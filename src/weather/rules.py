@@ -109,15 +109,12 @@ class WeatherRuleEngine:
         Derives leaf-wetness proxy tagged [ENG proxy].
         When a full time series with timestamps is provided, computes over historical past window up to current time.
         """
-        times = [str(t) for t in hourly_data.get("time", []) if t is not None]
-        if times and len(times) > 24:
-            _, end_idx = self._isolate_past_24h_window(
-                hourly_data, current_time_str=current_time_str, query_datetime=query_datetime
-            )
-            # Use past data up to the current hour (excludes future forecast)
-            data_slice = {k: v[:end_idx] if isinstance(v, list) else v for k, v in hourly_data.items()}
-        else:
-            data_slice = hourly_data
+        # Isolate exactly the past 24 hours ending at current observation time (same window as rules)
+        start_idx, end_idx = self._isolate_past_24h_window(
+            hourly_data, current_time_str=current_time_str, query_datetime=query_datetime
+        )
+        data_slice = {k: v[start_idx:end_idx] if isinstance(v, list) else v for k, v in hourly_data.items()}
+
 
         temps = [float(v) for v in data_slice.get("temperature_2m", []) if v is not None]
         rhs = [float(v) for v in data_slice.get("relative_humidity_2m", []) if v is not None]
@@ -255,35 +252,22 @@ class WeatherRuleEngine:
                     measured_str = f"RH_min={w_min_rh:.1f}%, temp_range=[{w_min_temp:.1f}, {w_max_temp:.1f}]°C"
 
             elif r_id == "W03":
-                # Bacterial spot: temp > 24°C AND precip > 0 AND wind > 15 km/h
+                # Bacterial spot: temp > 24°C AND precipitation > 0 AND wind > 15 km/h
+                # Sourced from Ritchie & Dittapongpitch (1991). Evaluates 24-hour summary aggregates.
                 t_min = float(criteria.get("temp_min", 24.0))
                 p_min = float(criteria.get("precip_min", 0.0))
                 w_min = float(criteria.get("wind_min", 15.0))
-                n_checks = min(len(w_temps), len(w_precips), len(w_winds))
-                matching_hours = [
-                    i for i in range(n_checks)
-                    if w_temps[i] > t_min and w_precips[i] > p_min and w_winds[i] > w_min
-                ]
-                triggered = len(matching_hours) > 0
-                if triggered:
-                    best_h = matching_hours[0]
-                    measured_str = (
-                        f"temp={w_temps[best_h]:.1f}°C, precip={w_precips[best_h]:.1f}mm, "
-                        f"wind={w_winds[best_h]:.1f}km/h ({len(matching_hours)}h matched)"
-                    )
-                else:
-                    measured_str = f"temp_max={w_max_temp:.1f}°C, precip_sum={w_precip_sum:.1f}mm, wind_max={w_max_wind:.1f}km/h"
+                triggered = (w_max_temp > t_min) and (w_precip_sum > p_min) and (w_max_wind > w_min)
+                measured_str = f"temp_max={w_max_temp:.1f}°C, precip_sum={w_precip_sum:.1f}mm, wind_max={w_max_wind:.1f}km/h"
 
             elif r_id == "W04":
-                # Early blight: temp > 24°C AND (precip_hours > 2 OR leaf_wetness_proxy > 2h)
+                # Early blight: temp > 24°C AND precip_hours > 2
+                # Sourced from Jones & Jones (1974). Evaluates 24-hour summary aggregates.
                 t_min = float(criteria.get("temp_min", 24.0))
                 p_hrs_min = int(criteria.get("precip_hours_min", 2))
-                lw_min = int(criteria.get("leaf_wetness_hours_min", 2))
-                triggered = (w_max_temp > t_min) and (w_precip_hours > p_hrs_min or w_leaf_wetness_hours > lw_min)
-                measured_str = (
-                    f"temp_max={w_max_temp:.1f}°C, precip_hours={w_precip_hours}, "
-                    f"leaf_wetness_proxy={w_leaf_wetness_hours}h [ENG proxy]"
-                )
+                triggered = (w_max_temp > t_min) and (w_precip_hours > p_hrs_min)
+                measured_str = f"temp_max={w_max_temp:.1f}°C, precip_hours={w_precip_hours}"
+
 
             elif r_id == "W05":
                 # Septoria leaf spot: temp 15–25°C AND RH > 85%

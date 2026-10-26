@@ -72,6 +72,84 @@ class TestWeatherSummaryStats:
         assert stats.leaf_wetness_hours_proxy == 2
         assert stats.max_wind_speed_kmh == 20.0
 
+    def test_summary_stats_equal_rule_stats_with_forecast_rain_injected(self):
+        """
+        Verify that compute_summary_statistics and evaluate_rules use the exact same
+        rolling 24-hour window ending at current observation time:
+        - Heavy rain and high heat injected into historical days (day -3).
+        - Heavy rain and high heat injected into forecast days (day +2).
+        - Summary stats must strictly equal the 24-hour metrics evaluated by rules.
+        """
+        from datetime import datetime, timedelta
+
+        engine = WeatherRuleEngine()
+        base_time = datetime(2026, 10, 20, 0, 0)
+        times = [(base_time + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00") for i in range(240)]
+
+        curr_idx = 168
+        curr_time_str = times[curr_idx]
+
+        temps = [25.0] * 240
+        rhs = [50.0] * 240
+        precips = [0.0] * 240
+        winds = [10.0] * 240
+        dews = [12.0] * 240
+
+        # Inject historical rain 3 days ago (hours 50-60)
+        for h in range(50, 60):
+            precips[h] = 15.0
+            rhs[h] = 95.0
+            temps[h] = 34.0
+            winds[h] = 25.0
+
+        # Inject forecast rain 2 days in future (hours 200-210)
+        for h in range(200, 210):
+            precips[h] = 20.0
+            rhs[h] = 98.0
+            temps[h] = 35.0
+            winds[h] = 30.0
+
+        # In the past 24h window ending at curr_time_str (hours curr_idx-23 to curr_idx)
+        for i, h in enumerate(range(curr_idx - 23, curr_idx + 1)):
+            temps[h] = 19.5 + (31.0 - 19.5) * (i / 23.0)  # min 19.5, max 31.0
+            rhs[h] = 35.0 + (78.0 - 35.0) * (i / 23.0)     # min 35.0, max 78.0
+            precips[h] = 0.0                               # 0.0 mm
+            winds[h] = 8.0 + (14.0 - 8.0) * (i / 23.0)     # max 14.0
+            dews[h] = 11.0
+
+        hourly_data = {
+            "time": times,
+            "temperature_2m": temps,
+            "relative_humidity_2m": rhs,
+            "precipitation": precips,
+            "wind_speed_10m": winds,
+            "dew_point_2m": dews,
+        }
+
+        stats = engine.compute_summary_statistics(hourly_data, current_time_str=curr_time_str)
+        rule_results = {r.rule_id: r for r in engine.evaluate_rules(hourly_data, summary_stats=stats, current_time_str=curr_time_str)}
+
+        # 1. Assert summary stats strictly exclude past 7d and future forecast
+        assert stats.max_temperature_c == 31.0
+        assert stats.min_temperature_c == 19.5
+        assert stats.max_relative_humidity_pct == 78.0
+        assert stats.min_relative_humidity_pct == 35.0
+        assert stats.total_precipitation_mm == 0.0
+        assert stats.precipitation_hours == 0
+        assert stats.leaf_wetness_hours_proxy == 0
+        assert stats.max_wind_speed_kmh == 14.0
+
+        # 2. Assert rule evaluations used the exact same 24-hour summary stats
+        assert f"RH_max={stats.max_relative_humidity_pct:.1f}%" in rule_results["W01"].measured_values
+        assert f"temp_min={stats.min_temperature_c:.1f}°C" in rule_results["W01"].measured_values
+        assert f"temp_max={stats.max_temperature_c:.1f}°C" in rule_results["W03"].measured_values
+        assert f"precip_sum={stats.total_precipitation_mm:.1f}mm" in rule_results["W03"].measured_values
+        assert f"wind_max={stats.max_wind_speed_kmh:.1f}km/h" in rule_results["W03"].measured_values
+        assert f"temp_max={stats.max_temperature_c:.1f}°C" in rule_results["W04"].measured_values
+        assert f"precip_hours={stats.precipitation_hours}" in rule_results["W04"].measured_values
+        assert f"precip_sum_24h={stats.total_precipitation_mm:.1f}mm" in rule_results["W08"].measured_values
+
+
 
 class TestRuleBoundaries:
     """Verify triggers and boundary non-triggers for W01–W08."""
@@ -135,7 +213,24 @@ class TestRuleBoundaries:
         assert {r.rule_id: r for r in engine.evaluate_rules(d2)}["W03"].triggered is False
         assert {r.rule_id: r for r in engine.evaluate_rules(d3)}["W03"].triggered is False
 
-    # ── W04: Early blight (temp > 24°C AND (precip_hours > 2 OR leaf_wetness_proxy > 2)) ──
+    def test_w03_combines_24h_aggregates_across_different_hours(self, engine):
+        """
+        Verify W03 combines 24-hour summary aggregates:
+        Driving rainstorm occurs at night (hour 0: temp=20°C <= 24, precip=1.5mm, wind=20 km/h).
+        Warm peak occurs during afternoon (hour 14: temp=27°C > 24, no rain, mild wind).
+        Assert W03 triggers because over the past 24h: temp_max > 24, precip_sum > 0, wind_max > 15.
+        """
+        data = make_hourly_series(temp=22.0, precip=0.0, wind=10.0)
+        data["temperature_2m"][14] = 27.0
+        data["precipitation"][0] = 1.5
+        data["wind_speed_10m"][0] = 20.0
+        results = {r.rule_id: r for r in engine.evaluate_rules(data)}
+        assert results["W03"].triggered is True
+        assert "temp_max=27.0°C" in results["W03"].measured_values
+        assert "precip_sum=1.5mm" in results["W03"].measured_values
+        assert "wind_max=20.0km/h" in results["W03"].measured_values
+
+    # ── W04: Early blight (temp > 24°C AND precip_hours > 2) ──
     def test_w04_triggers_via_precip_hours(self, engine):
         data = make_hourly_series(temp=25.0, precip=0.0, rh=60.0)
         # Add 3 hours of precipitation
@@ -144,22 +239,23 @@ class TestRuleBoundaries:
         data["precipitation"][2] = 1.0
         results = {r.rule_id: r for r in engine.evaluate_rules(data)}
         assert results["W04"].triggered is True
+        assert "precip_hours=3" in results["W04"].measured_values
 
-    def test_w04_triggers_via_leaf_wetness_proxy(self, engine):
-        # 0 rain, but 3 hours of RH >= 90%
-        data = make_hourly_series(temp=25.0, precip=0.0, rh=70.0)
-        data["relative_humidity_2m"][0] = 92.0
-        data["relative_humidity_2m"][1] = 94.0
-        data["relative_humidity_2m"][2] = 91.0
+    def test_w04_leaf_wetness_alone_does_not_trigger_without_rain(self, engine):
+        """
+        In docs/spec/part6_build_spec.md §6d-v, W04 is strictly 'temp > 24°C AND precip_hours > 2'.
+        High relative humidity / leaf wetness proxy without actual rainfall does NOT trigger W04.
+        """
+        data = make_hourly_series(temp=26.0, precip=0.0, rh=95.0)
         results = {r.rule_id: r for r in engine.evaluate_rules(data)}
-        assert results["W04"].triggered is True
-        assert "leaf_wetness_proxy=3h [ENG proxy]" in results["W04"].measured_values
+        assert results["W04"].triggered is False
+        assert "precip_hours=0" in results["W04"].measured_values
 
-    def test_w04_boundary_fails_at_2_hours(self, engine):
-        # Exactly 2 hours of leaf wetness does NOT trigger (> 2 required)
+    def test_w04_boundary_fails_at_2_hours_rain(self, engine):
+        # Exactly 2 hours of rain does NOT trigger (> 2 required)
         data = make_hourly_series(temp=25.0, precip=0.0, rh=70.0)
-        data["relative_humidity_2m"][0] = 92.0
-        data["relative_humidity_2m"][1] = 94.0
+        data["precipitation"][0] = 1.0
+        data["precipitation"][1] = 1.0
         results = {r.rule_id: r for r in engine.evaluate_rules(data)}
         assert results["W04"].triggered is False
 
@@ -172,14 +268,11 @@ class TestRuleBoundaries:
     def test_w04_pune_smoke_values_not_triggered(self, engine):
         """
         Exact Pune smoke values:
-        temp_max = 33.6°C, precip_hours = 0, leaf_wetness_proxy = 0h.
-        Must NOT trigger W04 (Early blight requires temp > 24 AND (precip_hours > 2 OR leaf_wetness > 2)).
+        temp_max = 33.6°C, precip_hours = 0.
+        Must NOT trigger W04 (Early blight requires temp > 24 AND precip_hours > 2).
         """
-        # 24 hours of diurnal temperatures with max 33.6C, min 18.0C
         temps = [18.0 + (33.6 - 18.0) * (i / 23.0) for i in range(24)]
-        # All precipitation 0.0mm (precip_hours = 0)
         precips = [0.0] * 24
-        # RH ranging between 30% and 55% (all below 90% threshold, so leaf_wetness_proxy = 0h)
         rhs = [30.0 + (55.0 - 30.0) * (i / 23.0) for i in range(24)]
 
         data = {
@@ -194,43 +287,30 @@ class TestRuleBoundaries:
         assert res_w04.triggered is False
         assert "temp_max=33.6°C" in res_w04.measured_values
         assert "precip_hours=0" in res_w04.measured_values
-        assert "leaf_wetness_proxy=0h" in res_w04.measured_values
 
-    def test_w04_and_or_clause_failure_permutations(self, engine):
+    def test_w04_clause_failure_permutations(self, engine):
         """
-        Test the boolean truth table for W04:
-        Condition: temp > 24 AND (precip_hours > 2 OR leaf_wetness_proxy > 2h)
+        Test the boolean truth table for W04 (temp > 24 AND precip_hours > 2):
         """
-        # Case 1: Temp clause fails alone (temp <= 24, but precip_hours > 2 and leaf_wetness > 2)
-        d_temp_fails = make_hourly_series(temp=22.0, precip=1.0, rh=95.0)  # temp=22 <= 24
-        r1 = {r.rule_id: r for r in engine.evaluate_rules(d_temp_fails)}
-        assert r1["W04"].triggered is False
+        # Case 1: Temp clause fails alone (temp <= 24, precip_hours > 2)
+        d_temp_fails = make_hourly_series(temp=22.0, precip=1.0, rh=95.0)
+        assert {r.rule_id: r for r in engine.evaluate_rules(d_temp_fails)}["W04"].triggered is False
 
-        # Case 2: Moisture clause fails alone (temp > 24, but precip_hours <= 2 AND leaf_wetness <= 2)
-        d_moisture_fails = make_hourly_series(temp=28.0, precip=0.0, rh=60.0)
-        d_moisture_fails["precipitation"][0] = 0.5  # precip_hours = 1 (not > 2)
-        d_moisture_fails["relative_humidity_2m"][0] = 92.0  # leaf_wetness = 1 (not > 2)
-        r2 = {r.rule_id: r for r in engine.evaluate_rules(d_moisture_fails)}
-        assert r2["W04"].triggered is False
+        # Case 2: Precip clause fails alone (temp > 24, precip_hours <= 2)
+        d_precip_fails = make_hourly_series(temp=28.0, precip=0.0, rh=60.0)
+        d_precip_fails["precipitation"][0] = 0.5  # precip_hours = 1
+        assert {r.rule_id: r for r in engine.evaluate_rules(d_precip_fails)}["W04"].triggered is False
 
-        # Case 3: Both clauses fail (temp <= 24 AND neither precip nor leaf wetness > 2)
+        # Case 3: Both clauses fail (temp <= 24 AND precip_hours <= 2)
         d_both_fail = make_hourly_series(temp=20.0, precip=0.0, rh=50.0)
-        r3 = {r.rule_id: r for r in engine.evaluate_rules(d_both_fail)}
-        assert r3["W04"].triggered is False
+        assert {r.rule_id: r for r in engine.evaluate_rules(d_both_fail)}["W04"].triggered is False
 
-        # Case 4: Passes via precip_hours > 2 alone (temp > 24, leaf_wetness <= 2)
-        d_pass_precip = make_hourly_series(temp=26.0, precip=0.0, rh=60.0)
+        # Case 4: Both clauses pass (temp > 24 AND precip_hours > 2)
+        d_pass = make_hourly_series(temp=26.0, precip=0.0, rh=60.0)
         for i in range(3):
-            d_pass_precip["precipitation"][i] = 1.0  # precip_hours = 3
-        r4 = {r.rule_id: r for r in engine.evaluate_rules(d_pass_precip)}
-        assert r4["W04"].triggered is True
+            d_pass["precipitation"][i] = 1.0  # precip_hours = 3
+        assert {r.rule_id: r for r in engine.evaluate_rules(d_pass)}["W04"].triggered is True
 
-        # Case 5: Passes via leaf_wetness_proxy > 2 alone (temp > 24, precip_hours = 0)
-        d_pass_lw = make_hourly_series(temp=26.0, precip=0.0, rh=60.0)
-        for i in range(3):
-            d_pass_lw["relative_humidity_2m"][i] = 95.0  # leaf_wetness = 3
-        r5 = {r.rule_id: r for r in engine.evaluate_rules(d_pass_lw)}
-        assert r5["W04"].triggered is True
 
 
     # ── W05: Septoria leaf spot (temp 15–25°C AND RH > 85%) ──

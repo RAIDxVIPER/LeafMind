@@ -246,17 +246,44 @@ def scrub_doses_and_chemicals(text: Optional[str]) -> Optional[str]:
     if not has_chemical and not has_dose:
         return text
 
-    # 1. Multi-line sentence scrub (e.g. CIB&RC recommendation and TNAU sprays)
+    # 1. Multi-line sentence / paragraph scrubs across line breaks
+    cleaned_text = text
+
+    # Chilli CIB&RC recommendation
     cleaned_text = re.sub(
         r"(?i)For chilli,\s*CIB&RC\s+lists\s+kasugamycin[^\.]*?bacterial leaf spot\.\s*",
         "",
-        text,
+        cleaned_text,
         flags=re.DOTALL,
     )
     cleaned_text = re.sub(
         r"(?i)\bplus\s+streptocycline(?:\s+sprays)?\s*;",
         ";",
         cleaned_text,
+    )
+
+    # Apple scab: urea spray bullet across line breaks (drop entire bullet)
+    cleaned_text = re.sub(
+        r"(?i)(?:^|\n)[\s\x7f•\-\*]*Because the sexual stage forms on fallen leaves.*?(?:the NHB text does not state its purpose\.|urea spray[^\n]*\.)[ \t]*",
+        "\n",
+        cleaned_text,
+        flags=re.DOTALL,
+    )
+
+    # Grape esca: wound sealant with 5% boric acid paragraph (drop entire paragraph)
+    cleaned_text = re.sub(
+        r"(?i)(?:^|\n)[\s\x7f•\-\*]*A wound sealant of 5% boric acid.*?(?:These are US\s+products\.[ \t]*)",
+        "\n",
+        cleaned_text,
+        flags=re.DOTALL,
+    )
+
+    # Grape esca: Bordeaux paste paragraph (drop entire paragraph)
+    cleaned_text = re.sub(
+        r"(?i)(?:^|\n)[\s\x7f•\-\*]*India:\s*chapter 10 gives Bordeaux paste.*?(?:tests\s+it against esca\.[ \t]*)",
+        "\n",
+        cleaned_text,
+        flags=re.DOTALL,
     )
 
     lines = cleaned_text.split("\n")
@@ -267,6 +294,26 @@ def scrub_doses_and_chemicals(text: Optional[str]) -> Optional[str]:
         if re.search(r"\b(?:trichoderma|pseudomonas)\b[^\n\.;]*?\b\d+(?:\.\d+)?\s*(?:g|kg)", l_str, re.I):
             continue
         if re.search(r"\b(?:urea\s+spray|5%\s*boric|bordeaux\s+paste)\b", l_str, re.I):
+            continue
+
+        # Drop any dangling fragment starting with "Because" that has no complete main action after the comma
+        if re.match(r"^(?:[\x7f•\-\*]\s*)?Because\b", l_str, re.I):
+            parts = l_str.split(",", 1)
+            if len(parts) == 2:
+                after_comma = parts[1].strip()
+                has_action = bool(re.search(
+                    r"\b(?:is|are|was|were|can|will|should|must|reduces|helps|controls|gives|prevents|requires|needs|spread|spreads|forms|formed|protect|protects|limit|limits)\b",
+                    after_comma,
+                    re.I
+                ))
+                ends_hanging = bool(re.search(r"\b(?:by|the|and|or|of|in|for|published by|schedule)\s*$", after_comma, re.I))
+                if not has_action or ends_hanging:
+                    continue
+            else:
+                continue
+
+        # Drop orphaned lines left from dropped previous sentences
+        if re.match(r"^(?:dieback and esca|it against esca|products\.)\b", l_str, re.I):
             continue
 
         cleaned_line = line
@@ -281,6 +328,7 @@ def scrub_doses_and_chemicals(text: Optional[str]) -> Optional[str]:
         cleaned_line = re.sub(r"([.;])\s*([.;])", r"\1", cleaned_line)
         if cleaned_line.strip():
             kept_lines.append(cleaned_line)
+
 
     res = "\n".join(kept_lines)
     for pat in RE_DOSE_PATTERNS:
