@@ -160,3 +160,19 @@ class TestRAGRetriever:
                 assert retriever.resolve_crop(chunk.crop) == retriever.resolve_crop(crop), (
                     f"Leakage detected: expected {crop}, got {chunk.crop} (chunk {chunk.chunk_id})"
                 )
+
+    def test_semantic_search_generic_queries_no_leakage(self, retriever):
+        """Add a test with queries 'fruit rot', 'leaf spot', 'wilt' for each of the 8 crops, asserting only that crop's chunks are returned."""
+        crops = ["Tomato", "Apple", "Corn", "Grape", "Cherry", "Blueberry", "Potato", "Pepper,_bell"]
+        queries = ["fruit rot", "leaf spot", "wilt"]
+
+        for crop in crops:
+            canonical_crop = retriever.resolve_crop(crop)
+            for query in queries:
+                results = retriever.semantic_search(query, crop=crop, top_k=3)
+                assert len(results) > 0, f"Expected semantic results for query '{query}' on crop '{crop}'"
+                for chunk, score in results:
+                    assert retriever.resolve_crop(chunk.crop) == canonical_crop, (
+                        f"Cross-crop leakage: query '{query}' for crop '{crop}' returned chunk {chunk.chunk_id} with crop '{chunk.crop}'"
+                    )
+

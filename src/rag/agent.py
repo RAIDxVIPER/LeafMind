@@ -203,8 +203,111 @@ def extract_why_it_happens(causes_chunk: Optional[KBChunk]) -> Optional[str]:
     return "\n".join(cleaned_parts) if cleaned_parts else raw_sec2
 
 
+KNOWN_SUPPLEMENTARY_TAGS = {"TXP", "TXT", "TNT", "AUS", "AHDB", "UPL", "BRZ", "SHT"}
+
+RE_CHEMICAL_TARGETS = re.compile(
+    r"(?i)\b(?:kasugamycin|streptocycline|urea\s+spray|5%\s*boric|bordeaux\s+paste)\b"
+    r"|\btrichoderma\b[^\n\.;]*?\b\d+\s*(?:g|kg)\s*/\s*(?:kg|ha|ac|acre)\b"
+)
+
+RE_DOSE_PATTERNS = [
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s*(?:/|per)\s*\d*\s*(?:kg|l|L|ha|acre|ac|litre|100\s*L)\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*%\s*\+\s*\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)?\b", re.I),
+    re.compile(r"\b\d+(?:\.\d+)?\s*(?:ppm|mg/L)\b", re.I),
+    re.compile(r"\b(?:at\s+)?(?:\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s+)?per\s+100\s*L\b", re.I),
+]
+
+
+def scrub_doses_and_chemicals(text: Optional[str]) -> Optional[str]:
+    """
+    Remove application rates, concentrations, formulation strengths, and sentences
+    recommending named pesticides, antibiotics or active ingredients when include_doses=False [D28].
+    Preserves generic terms (copper, fungicide, bactericide) and resistance descriptions.
+    """
+    if not text:
+        return text
+
+    has_chemical = bool(RE_CHEMICAL_TARGETS.search(text))
+    has_dose = any(bool(p.search(text)) for p in RE_DOSE_PATTERNS)
+    if not has_chemical and not has_dose:
+        return text
+
+    lines = text.split("\n")
+    kept_lines = []
+    for line in lines:
+        l_str = line.strip()
+        if RE_CHEMICAL_TARGETS.search(l_str):
+            # Drop entire bullet if it recommends named chemical or rate
+            if any(k in l_str.lower() for k in ["trichoderma", "urea spray", "5% boric", "bordeaux paste"]):
+                continue
+            # If line contains streptocycline or kasugamycin (e.g. in narrative text), remove recommendation clause
+            cleaned_line = line
+            cleaned_line = re.sub(
+                r"(?i)(?:TNAU's recommendation is [^;\.]*streptocycline sprays;\s*)",
+                "",
+                cleaned_line,
+            )
+            cleaned_line = re.sub(
+                r"(?i)(?:For chilli, CIB&RC lists [^\.]*bacterial leaf spot\.\s*)",
+                "",
+                cleaned_line,
+            )
+            cleaned_line = re.sub(r"(?<=\.\s)([a-z])", lambda m: m.group(1).upper(), cleaned_line)
+            cleaned_line = re.sub(r"(?<=^)([a-z])", lambda m: m.group(1).upper(), cleaned_line)
+            if cleaned_line.strip():
+                kept_lines.append(cleaned_line)
+            continue
+        kept_lines.append(line)
+
+    res = "\n".join(kept_lines)
+
+    # Clean multi-line wrapped sentences
+    res = re.sub(
+        r"(?i)For chilli, CIB&RC lists kasugamycin 3% SL and streptocycline\s*\(9% \+ 1% SP\) for bacterial leaf spot\.\s*",
+        "",
+        res,
+    )
+    res = re.sub(
+        r"(?i)TNAU's recommendation is disease-free seed plus streptocycline sprays;\s*",
+        "",
+        res,
+    )
+    res = re.sub(r"(?i)(?<=\. )([a-z])", lambda m: m.group(1).upper(), res)
+
+    # Scrub remaining inline rate patterns
+    for pat in RE_DOSE_PATTERNS:
+        res = pat.sub("", res)
+
+    res = re.sub(r"\(\s*\)", "", res)
+    res = re.sub(r"[ \t]+", " ", res)
+    res = re.sub(r"([.;])\s*([.;])", r"\1", res)
+    return res.strip()
+
+
+def is_tag_supplementary(tag: str, title: str, crop: Optional[str] = None) -> bool:
+    """Determine if a citation tag represents a supplementary or secondary source."""
+    t_upper = tag.upper().strip()
+    if t_upper in KNOWN_SUPPLEMENTARY_TAGS:
+        return True
+    t_low = title.lower()
+    if any(k in t_low for k in ["supplementary", "non-indian", "israel", "australia", "texas"]):
+        return True
+    if crop:
+        crop_low = crop.lower()
+        if crop_low in ["pepper", "pepper,_bell", "chilli"]:
+            if "tomato" in t_low and "pepper" not in t_low and "chilli" not in t_low:
+                return True
+        elif crop_low == "tomato":
+            if ("pepper" in t_low or "grape" in t_low) and "tomato" not in t_low:
+                return True
+    return False
+
+
 def extract_what_to_do_first(
     prev_chunk: Optional[KBChunk],
+    sources_chunk: Optional[KBChunk] = None,
+    crop: Optional[str] = None,
     include_doses: bool = False,
 ) -> Optional[str]:
     """
@@ -216,11 +319,22 @@ def extract_what_to_do_first(
     if not prev_chunk or not prev_chunk.text:
         return None
 
-    lines = [l.strip() for l in prev_chunk.text.split("\n") if l.strip()]
+    # Exclude Regional note section so it does not attach to the trailing bullet
+    text = re.sub(r"(?i)\n\s*Regional note.*", "", prev_chunk.text, flags=re.DOTALL)
+
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
     if not lines:
         return None
 
-    raw_bullets = re.split(r"(?:^|\n)\s*[\u2022\u25cf\-\*\x7f\ufffd]\s*", prev_chunk.text)
+    raw_bullets = re.split(r"(?:^|\n)\s*[\u2022\u25cf\-\*\x7f\ufffd]\s*", text)
+    citations = parse_citations_from_chunk(sources_chunk) if sources_chunk else []
+    tag_map = {c.tag: c for c in citations}
+
+    def tag_is_supp(tag: str) -> bool:
+        c = tag_map.get(tag)
+        title = c.title if c else ""
+        return is_tag_supplementary(tag, title, crop)
+
     bullets: List[str] = []
     for b in raw_bullets:
         clean = re.sub(r"\s+", " ", b).strip()
@@ -245,43 +359,76 @@ def extract_what_to_do_first(
         return lines[0]
 
     def score_bullet(bullet: str) -> int:
-        """
-        Lower score = higher priority (comes first).
-        0: Immediate physical sanitation / removal of infected parts / hygiene / burning / destroying
-        1: Immediate water / moisture / irrigation / drainage / airflow / staking / pruning
-        2: Immediate label-checked spray / bioagent / fungicide / protectant mention
-        3: Other cultural practices (crop rotation, planting date, weed control, spacing)
-        4: Resistant-variety / hybrid / cultivar advice (comes LAST)
-        """
         b_low = bullet.lower()
-        is_resistant = any(k in b_low for k in [
-            "resistant", "hybrid", "cultivar", "variety", "tolerant", "arka", "iihr",
-            "ph-2", "ph-3", "resistance", "released hybrids", "non-host"
-        ])
+
+        # Extract tags from bullet
+        bullet_tags = []
+        for m in re.finditer(r"\(([A-Za-z0-9_\-,\s]+)\)", bullet):
+            for t in m.group(1).split(","):
+                t_clean = t.strip()
+                if t_clean in tag_map or t_clean in KNOWN_SUPPLEMENTARY_TAGS:
+                    bullet_tags.append(t_clean)
+
+        is_supp = False
+        if bullet_tags:
+            is_supp = all(tag_is_supp(t) for t in bullet_tags)
+        elif any(k in b_low for k in ["supplementary", "non-indian", "other crop"]):
+            is_supp = True
+
+        supp_penalty = 30 if is_supp else 0
+
+        # Rationale check: skip or penalise bullets starting with 'Because', 'In ...', or author descriptions
+        is_rationale = bool(re.match(r"^(?:Because|In\s+[A-Za-z]+|Authors?|A\s+review|Studies)\b", bullet, re.I))
+        rationale_penalty = 25 if is_rationale else 0
+
+        # Urea spray / named chemical / rate penalty when include_doses=False
+        has_chemical_rate = bool(
+            re.search(r"\b(?:urea\s+spray|5%\s*boric|bordeaux\s+paste|kasugamycin|streptocycline)\b", b_low) or
+            re.search(r"\b\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s*(?:/|per)", b_low) or
+            re.search(r"\bper\s+100\s*L\b", b_low)
+        )
+        chemical_rate_penalty = 50 if (not include_doses and has_chemical_rate) else 0
+
+        # General pesticide spray penalty when include_doses=False
+        has_pesticide_spray = bool(
+            re.search(r"\b(?:spray programme|sprays? started|pesticide)\b", b_low)
+        )
+        pesticide_penalty = 15 if (not include_doses and has_pesticide_spray) else 0
+
+        # Descriptive resistance statement penalty (e.g. "Resistance to dodine... has been reported")
+        is_descriptive_resistance = bool(re.match(r"^Resistance\s+to\b", bullet, re.I))
+        resistance_stmt_penalty = 20 if is_descriptive_resistance else 0
+
         is_sanitation = any(k in b_low for k in [
-            "remove", "destroy", "burn", "bury", "dispose", "field hygiene", "clean",
+            "remove", "destroy", "burn", "bury", "field hygiene", "clean",
             "infected plant parts", "infected parts", "infected leaves", "affected parts",
-            "abnormal unharvested", "cut wood", "paste cut surfaces", "fallen leaves",
-            "stubble", "sanitation", "debris", "cankered"
+            "disease-free seed", "healthy transplants", "clean seed", "certified seed",
+            "seed treatment", "stubble", "sanitation", "debris"
         ])
         is_drainage = any(k in b_low for k in [
             "drainage", "irrigation", "avoid overhead", "soil moisture", "mulch",
             "airflow", "spacing", "staking", "ventilate", "aeration"
         ])
-        is_spray = any(k in b_low for k in [
-            "spray", "fungicide", "bordeaux", "paste", "copper", "application",
-            "trichoderma", "bacillus", "scout", "first spray", "protectant", "label"
+        is_resistant = any(k in b_low for k in [
+            "resistant", "hybrid", "cultivar", "variety", "tolerant", "arka", "iihr",
+            "ph-2", "ph-3", "released hybrids"
         ])
 
+        # Direct imperative check
+        is_imperative = bool(re.match(r"^(?:[A-Z][a-z]+:?\s+)?(?:Use|Remove|Burn|Bury|Collect|Avoid|Plant|Grow|Raise|Reduce|Clean|Prune|Rotate|Ensure|Time|Scout|Clear|Sanitize|Sanitise|Restrict)\b", bullet))
+        imperative_bonus = -3 if (is_imperative and not is_resistant) else 0
+
+        base = 5
         if is_sanitation:
-            return 0
-        if is_drainage:
-            return 1
-        if is_spray and not is_resistant:
-            return 2
-        if is_resistant:
-            return 4
-        return 3
+            base = 0
+        elif is_drainage:
+            base = 1
+        elif is_resistant:
+            base = 10  # Resistant variety comes LAST
+        else:
+            base = 2
+
+        return base + supp_penalty + rationale_penalty + chemical_rate_penalty + pesticide_penalty + resistance_stmt_penalty + imperative_bonus
 
     sorted_bullets = sorted(bullets, key=score_bullet)
     return sorted_bullets[0]
@@ -366,7 +513,12 @@ class RAGAgent:
         # Extractive assembly from chapter chunks
         what_it_is = extract_what_it_is(retrieval.glance_chunk, retrieval.identification_chunk)
         why_it_happens = extract_why_it_happens(retrieval.causes_chunk)
-        what_to_do_first = extract_what_to_do_first(retrieval.prevention_chunk, include_doses=include_doses)
+        what_to_do_first = extract_what_to_do_first(
+            retrieval.prevention_chunk,
+            sources_chunk=retrieval.sources_chunk,
+            crop=retrieval.crop,
+            include_doses=include_doses,
+        )
         favourable_conditions = extract_favourable_conditions(retrieval.favourable_chunk)
         look_alikes = extract_look_alikes(retrieval.identification_chunk)
         prevention = extract_prevention(retrieval.prevention_chunk)
@@ -383,6 +535,23 @@ class RAGAgent:
             treatment_summary.append(what_to_do_first)
         if include_doses and chemical_options:
             treatment_summary.extend([f"{o.product} ({o.verification_tag})" for o in chemical_options[:3]])
+
+        preventive_summary = [what_to_do_first] if what_to_do_first else []
+
+        # Dose scrub at assembly time when include_doses=False [D28]
+        if not include_doses:
+            what_it_is = scrub_doses_and_chemicals(what_it_is)
+            why_it_happens = scrub_doses_and_chemicals(why_it_happens)
+            what_to_do_first = scrub_doses_and_chemicals(what_to_do_first)
+            favourable_conditions = scrub_doses_and_chemicals(favourable_conditions)
+            look_alikes = scrub_doses_and_chemicals(look_alikes)
+            prevention = scrub_doses_and_chemicals(prevention)
+            treatment_summary = [
+                s for s in (scrub_doses_and_chemicals(t) for t in treatment_summary) if s
+            ]
+            preventive_summary = [
+                s for s in (scrub_doses_and_chemicals(p) for p in preventive_summary) if s
+            ]
 
         return RAGOutput(
             crop=retrieval.crop,
@@ -403,7 +572,7 @@ class RAGAgent:
             rag_available=True,
             knowledge_gap_flag=False,
             treatment_options=treatment_summary,
-            preventive_measures=[what_to_do_first] if what_to_do_first else [],
+            preventive_measures=preventive_summary,
         )
 
     def process_vision_output(

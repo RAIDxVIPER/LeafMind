@@ -280,8 +280,11 @@ class TestRAGIngestion:
 
         chunks, _ = ingested_data
 
-        pat_pipe_page  = re.compile(r"\| Page \d+")
+        pat_pipe_page = re.compile(r"\|\s*Page\s*\d+", re.IGNORECASE)
         pat_master_doc = re.compile(r"master document", re.IGNORECASE)
+        pat_combined_ref = re.compile(r"combined reference", re.IGNORECASE)
+        pat_pipe_compiled = re.compile(r"\|\s*Compiled", re.IGNORECASE)
+        pat_doc_footer = re.compile(r"\bdiseases\b.*?Page\s+\d+", re.IGNORECASE)
         # "Regional note" embedded mid-line (not at line start / after newline)
         pat_regional_note_embedded = re.compile(r"(?<!\n)(?<!^)Regional note", re.IGNORECASE | re.MULTILINE)
 
@@ -297,6 +300,18 @@ class TestRAGIngestion:
             if pat_master_doc.search(t):
                 violations.append(
                     f"{chunk.chunk_id}: contains 'master document' footer"
+                )
+            if pat_combined_ref.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: contains 'combined reference' footer/header"
+                )
+            if pat_pipe_compiled.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: contains '| Compiled' footer"
+                )
+            if pat_doc_footer.search(t):
+                violations.append(
+                    f"{chunk.chunk_id}: contains '<crop> diseases ... Page N' footer"
                 )
             if pat_regional_note_embedded.search(t):
                 violations.append(

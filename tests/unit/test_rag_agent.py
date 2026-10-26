@@ -126,6 +126,9 @@ class TestRAGAgent:
             # Verify it does not mention chemical dose formulas
             assert "ml/ha" not in ro.what_to_do_first
             assert "kg/ha" not in ro.what_to_do_first
+            if model_class == "Pepper,_bell___Bacterial_spot":
+                assert "(TXT, supplementary)" not in ro.what_to_do_first
+                assert "Regional note" not in ro.what_to_do_first
 
     def test_process_vision_output(self, agent):
         """process_vision_output takes VisionOutput and returns RAGOutput per candidate."""
@@ -174,3 +177,105 @@ class TestRAGAgent:
         ids1 = [c.chunk_id for c in chunks1]
         ids2 = [c.chunk_id for c in chunks2]
         assert ids1 == ids2
+
+    def test_dose_scrub_policy_all_17_classes(self, agent):
+        """
+        Verify dose scrubbing policy [D28]:
+        1. When include_doses=False: no narrative field matches dose/rate or named chemical patterns.
+        2. When include_doses=True: original text is returned completely unchanged.
+        """
+        import re
+
+        mapped_classes = [
+            ("Apple___Apple_scab", "Apple"),
+            ("Apple___Cedar_apple_rust", "Apple"),
+            ("Grape___Black_rot", "Grape"),
+            ("Grape___Esca_(Black_Measles)", "Grape"),
+            ("Corn___Northern_Leaf_Blight", "Corn"),
+            ("Corn___Common_rust", "Corn"),
+            ("Corn___Cercospora_leaf_spot", "Corn"),
+            ("Tomato___Early_blight", "Tomato"),
+            ("Tomato___Late_blight", "Tomato"),
+            ("Tomato___Septoria_leaf_spot", "Tomato"),
+            ("Tomato___Tomato_Yellow_Leaf_Curl_Virus", "Tomato"),
+            ("Tomato___Bacterial_spot", "Tomato"),
+            ("Tomato___Leaf_Mold", "Tomato"),
+            ("Tomato___Tomato_mosaic_virus", "Tomato"),
+            ("Potato___Late_blight", "Potato"),
+            ("Potato___Early_blight", "Potato"),
+            ("Pepper,_bell___Bacterial_spot", "Pepper,_bell"),
+        ]
+
+        banned_patterns = [
+            re.compile(r"\b\d+(?:\.\d+)?\s*(?:g|kg|mg|ml|l|L)\s*(?:/|per)\s*\d*\s*(?:kg|l|L|ha|acre|ac|litre|100\s*L)\b", re.I),
+            re.compile(r"\b\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)\b", re.I),
+            re.compile(r"\b\d+(?:\.\d+)?\s*%\s*\+\s*\d+(?:\.\d+)?\s*%\s*(?:SL|SP|EC|WP|WG|SC|DP|FS)?\b", re.I),
+            re.compile(r"\b(?:ppm|mg/L|per 100\s*L)\b", re.I),
+            re.compile(r"\b(?:kasugamycin|streptocycline|bordeaux paste|5%\s*boric)\b", re.I),
+            re.compile(r"\burea\s+spray\b", re.I),
+        ]
+
+        fields = [
+            "what_it_is",
+            "why_it_happens",
+            "what_to_do_first",
+            "prevention",
+            "look_alikes",
+            "favourable_conditions",
+        ]
+
+        for model_class, crop in mapped_classes:
+            ro_scrubbed = agent.query_candidate(model_class, crop=crop, include_doses=False)
+            ro_original = agent.query_candidate(model_class, crop=crop, include_doses=True)
+
+            # Check that scrubbed fields contain NO banned dose patterns
+            for f in fields:
+                val = getattr(ro_scrubbed, f)
+                if val:
+                    for pat in banned_patterns:
+                        m = pat.search(val)
+                        assert not m, f"Dose leak in {model_class}.{f}: '{m.group(0)}' in '{val[:80]}...'"
+
+            for item in ro_scrubbed.treatment_options:
+                for pat in banned_patterns:
+                    m = pat.search(item)
+                    assert not m, f"Dose leak in {model_class}.treatment_options: '{m.group(0)}'"
+
+            for item in ro_scrubbed.preventive_measures:
+                for pat in banned_patterns:
+                    m = pat.search(item)
+                    assert not m, f"Dose leak in {model_class}.preventive_measures: '{m.group(0)}'"
+
+            # Check that with include_doses=True, original chemical references remain intact
+            if model_class == "Apple___Apple_scab":
+                assert "urea spray" in ro_original.prevention
+                assert "5 kg per 100 L" in ro_original.prevention
+            elif model_class == "Grape___Esca_(Black_Measles)":
+                assert "5% boric" in ro_original.prevention
+                assert "Bordeaux paste" in ro_original.prevention
+            elif model_class == "Tomato___Early_blight":
+                assert "4 g/kg" in ro_original.prevention
+            elif model_class == "Tomato___Late_blight":
+                assert "1.0 kg/ac" in ro_original.prevention
+            elif model_class == "Tomato___Septoria_leaf_spot":
+                assert "4 g/kg" in ro_original.prevention
+            elif model_class == "Tomato___Bacterial_spot":
+                assert "streptocycline" in ro_original.what_it_is
+            elif model_class == "Pepper,_bell___Bacterial_spot":
+                assert "kasugamycin 3% SL" in ro_original.what_it_is
+                assert "streptocycline" in ro_original.what_it_is
+
+    def test_what_to_do_first_reworked_expected_actions(self, agent):
+        """
+        Verify specific expectations for reworked what_to_do_first:
+        1. Pepper bacterial spot: clean seed / healthy transplants.
+        2. Apple scab: Mills infection period monitoring (not urea spray).
+        """
+        ro_pepper = agent.query_candidate("Pepper,_bell___Bacterial_spot", crop="Pepper,_bell", include_doses=False)
+        assert ro_pepper.what_to_do_first is not None
+        assert "disease-free seed and healthy transplants" in ro_pepper.what_to_do_first.lower()
+
+        ro_apple = agent.query_candidate("Apple___Apple_scab", crop="Apple", include_doses=False)
+        assert ro_apple.what_to_do_first is not None
+        assert "urea" not in ro_apple.what_to_do_first.lower()
+        assert "mills" in ro_apple.what_to_do_first.lower()
