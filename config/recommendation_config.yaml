@@ -1,0 +1,30 @@
+# =============================================================================
+# LeafMind — Recommendation Agent Configuration (Stage C6)
+# =============================================================================
+# NOTE (I25): LLM model names change across API releases.
+# Always verify active model names before modifying or deploying to production.
+# For Gemini: e.g. "gemini-2.5-flash", "gemini-1.5-flash"
+# For Ollama: e.g. "llama3:8b", "mistral:latest"
+# =============================================================================
+
+llm:
+  provider: "gemini"  # Default if LLM_PROVIDER env var is not set
+  gemini:
+    model: "gemini-2.5-flash"  # Verified Gemini model name [I25]
+    temperature: 0.2
+    max_output_tokens: 2048
+    timeout_seconds: 30
+  ollama:
+    model: "llama3:8b"         # Verified Ollama model name [I25]
+    base_url: "http://localhost:11434"
+    temperature: 0.2
+    timeout_seconds: 30
+
+urgency_mapping:
+  severe_no_escalate: "within_24h"
+  severe_escalate: "consult_agronomist"
+  moderate_no_escalate: "within_48h"
+  moderate_escalate: "consult_agronomist"
+  low_no_escalate: "monitor"
+  low_escalate: "consult_agronomist"
+  rag_unavailable: "consult_agronomist"

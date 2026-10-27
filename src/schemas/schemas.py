@@ -399,22 +399,58 @@ class RiskOutput(BaseModel):
 class RecommendationInput(BaseModel):
     risk: RiskOutput
     rag: RAGOutput
+    vision: Optional[VisionOutput] = None
+    weather: Optional[WeatherOutput] = None
+    include_doses: bool = False
 
 class RecommendationOutput(BaseModel):
     """
-    Farmer-facing recommendation. All treatment content must be traceable to RAGOutput.citations.
-    cost_estimate_note is null until knowledge base is built.
+    Farmer-facing recommendation (Stage C6).
+    All treatment content must be traceable to RAGOutput.citations or risk/weather fields.
+    cost_estimate_note is null until knowledge base contains cost data [GAP].
     """
-    actions: List[str]          # Empty list + escalate_to_human=True when RAG unavailable
+    # C6 specification fields
+    summary: str = Field(default="", description="Advisory summary")
     urgency: str = Field(..., pattern=r"^(immediate|within_24h|within_48h|within_week|monitor|consult_agronomist)$")
-    risk_level: str
-    confidence_justification: str   # Plain-language explanation of confidence for farmer
-    citations: List[str]
-    caveats: List[str]              # Any limitations or warnings
+    what_to_do_first: Optional[str] = Field(None, description="Immediate cultural/sanitation/treatment action")
+    steps: List[str] = Field(default_factory=list, description="Actionable advisory steps")
+    weather_note: Optional[str] = Field(None, description="Weather-related advisory context [UNVERIFIED — I14]")
+    uncertainty_note: Optional[str] = Field(None, description="Uncertainty explanation, top-3 candidates, or healthy disclaimer")
+    citations: List[str] = Field(default_factory=list, description="Citations passed through from RAG")
+    flags: List[str] = Field(default_factory=list, description="Operational flags (e.g. PROVISIONAL_SEVERITY_GAP_ROW, WEATHER_UNVERIFIED_I14)")
+    llm_used: bool = Field(default=False, description="True if LLM reworded advice; False if deterministic fallback used")
+    fallback_reason: Optional[str] = Field(None, description="Reason deterministic fallback was used when llm_used=False")
+
+    # Backward-compatible fields from spec v1.0 / test_schemas.py
+    actions: List[str] = Field(default_factory=list, description="Alias for steps")
+    risk_level: str = Field(default="moderate", description="Risk level from RiskOutput")
+    confidence_justification: str = Field(default="", description="Plain-language explanation of confidence for farmer")
+    caveats: List[str] = Field(default_factory=list, description="Any limitations or warnings")
     cost_estimate_note: None = Field(None, description="Always null [GAP — no cost data in RAG]")
-    rag_grounded: bool              # False when RAG unavailable
-    escalate_to_human: bool
-    knowledge_gap_caveated: bool    # True when knowledge_gap_flag was set
+    rag_grounded: bool = Field(default=False, description="False when RAG unavailable or empty citations")
+    escalate_to_human: bool = Field(default=False, description="True if agronomist escalation required")
+    knowledge_gap_caveated: bool = Field(default=False, description="True when knowledge_gap_flag was set")
+
+    @model_validator(mode="after")
+    def sync_legacy_fields(self) -> "RecommendationOutput":
+        # Keep steps and actions synchronized
+        if self.steps and not self.actions:
+            self.actions = list(self.steps)
+        elif self.actions and not self.steps:
+            self.steps = list(self.actions)
+        # Summary fallback
+        if not self.summary:
+            if self.what_to_do_first:
+                self.summary = self.what_to_do_first
+            elif self.actions:
+                self.summary = self.actions[0]
+            else:
+                self.summary = "Advisory recommendation generated."
+        # Actions fallback
+        if not self.actions and self.what_to_do_first:
+            self.actions = [self.what_to_do_first]
+            self.steps = [self.what_to_do_first]
+        return self
 
 
 # ── Monitoring Agent ───────────────────────────────────────────────────────────
