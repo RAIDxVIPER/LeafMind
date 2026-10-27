@@ -18,22 +18,51 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.rag.agent import BROAD_ACTIVES, RE_DOSE_PATTERNS
 
-# Regex for numbers (integers, decimals, percentages, e.g. 5, 2.5, 90%, 3-5)
+# Regex for numbers (integers, decimals, percentages, e.g. 5, 2.5, 90%, 30)
 RE_NUMBER = re.compile(r"\b\d+(?:\.\d+)?%?\b")
 
-# Standard numbers allowed in advisory phrasing (intervals, hours, steps)
-STANDARD_ALLOWED_NUMBERS = {
-    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-    "24", "48", "72", "100", "0", "0.0", "1.0",
-}
+# Word-forms for numbers and time units in advisory phrasing
+NUMBER_WORDS = r"(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)"
+TIME_UNITS = r"(?:days?|weeks?|months?|hours?)"
+
+# Regex for treatment/spray intervals, frequencies, and number-words
+RE_INTERVAL = re.compile(
+    r"\b(?:"
+    r"every\s+(?:other\s+)?(?:" + NUMBER_WORDS + r"\s+)?" + TIME_UNITS + r"|"
+    r"(?:" + NUMBER_WORDS + r"|once|twice|thrice)\s+times?\s*(?:a|per)?\s*(?:" + TIME_UNITS + r")?|"
+    r"(?:once|twice|thrice)\s+(?:a|per)\s*" + TIME_UNITS + r"|"
+    r"\b(?:twice|thrice|weekly|fortnightly|biweekly)\b|"
+    r"(?:one|two|three|four|five|six|seven|eight|nine|ten)\s+" + TIME_UNITS +
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def extract_numbers(text: str) -> Set[str]:
     """Extract normalized set of numeric tokens from text."""
     if not text:
         return set()
-    matches = RE_NUMBER.findall(text)
-    return {m.lower().rstrip("%") for m in matches}
+    # Normalize word-attached time units e.g. 24h -> 24 h, 7days -> 7 days, within_24h -> within 24h
+    cleaned = re.sub(
+        r"(\d+)(h|hrs?|hours?|days?|weeks?|months?)",
+        r"\1 \2",
+        text,
+        flags=re.IGNORECASE,
+    )
+    cleaned = cleaned.replace("_", " ")
+    matches = RE_NUMBER.findall(cleaned)
+    results = set()
+    for m in matches:
+        raw = m.lower().rstrip("%")
+        results.add(raw)
+        if "." in raw:
+            try:
+                val = float(raw)
+                if val.is_integer():
+                    results.add(str(int(val)))
+            except ValueError:
+                pass
+    return results
 
 
 def extract_products(text: str) -> Set[str]:
@@ -51,10 +80,15 @@ def extract_products(text: str) -> Set[str]:
 
 
 def clean_step_indices(steps: List[str]) -> List[str]:
-    """Strip leading step numbers (e.g. '1. ', '(2) ') from steps list."""
+    """Strip leading step numbers/indices (e.g. '1. ', 'Step 1: ', '(2) ') from steps list."""
     cleaned = []
     for s in steps:
-        c = re.sub(r"^\s*(?:\d+[\.\)]|\(?\d+\))\s*", "", str(s))
+        c = re.sub(
+            r"^\s*(?:(?:step\s*)?\d+[\.\:\)\-]|(?:\(step\s*)?\d+\))\s*",
+            "",
+            str(s),
+            flags=re.IGNORECASE,
+        )
         cleaned.append(c)
     return cleaned
 
@@ -104,9 +138,15 @@ def validate_grounding(
     if not summary and not what_to_do_first and not steps:
         return False, "empty_llm_output_fields", None
 
-    # Clean leading list numbers from steps for number validation
+    # Clean leading list numbers from steps and what_to_do_first for number validation
+    cleaned_what_to_do = re.sub(
+        r"^\s*(?:(?:step\s*)?\d+[\.\:\)\-]|(?:\(step\s*)?\d+\))\s*",
+        "",
+        str(what_to_do_first),
+        flags=re.IGNORECASE,
+    )
     cleaned_steps = clean_step_indices(steps)
-    combined_output = " ".join([summary, what_to_do_first] + cleaned_steps + [weather_note, uncertainty_note])
+    combined_output = " ".join([summary, cleaned_what_to_do] + cleaned_steps + [weather_note, uncertainty_note])
 
     # 1. Check for doses if include_doses=False (D23/D28)
     if not include_doses:
@@ -124,13 +164,26 @@ def validate_grounding(
         bad_prod = next(iter(ungrounded_products))
         return False, f"ungrounded_product: '{bad_prod}' not in input", None
 
-    # 3. Check for ungrounded numbers
+    # 3. Check for ungrounded treatment/spray interval phrases and number-words
+    interval_matches = RE_INTERVAL.findall(combined_output)
+    if interval_matches:
+        input_lower = input_prompt.lower().replace("_", " ")
+        for phrase in interval_matches:
+            clean_phrase = phrase.strip().lower()
+            if clean_phrase and clean_phrase not in input_lower:
+                return (
+                    False,
+                    f"ungrounded_number: interval '{phrase}' not in input",
+                    None,
+                )
+
+    # 4. Check for ungrounded numbers (only allowed if in input text or step index)
     output_numbers = extract_numbers(combined_output)
-    input_numbers = extract_numbers(input_prompt).union(STANDARD_ALLOWED_NUMBERS)
+    input_numbers = extract_numbers(input_prompt)
 
     ungrounded_numbers = output_numbers - input_numbers
     if ungrounded_numbers:
-        bad_num = next(iter(ungrounded_numbers))
+        bad_num = next(iter(sorted(ungrounded_numbers)))
         return False, f"ungrounded_number: '{bad_num}' not in input", None
 
     parsed_result = {

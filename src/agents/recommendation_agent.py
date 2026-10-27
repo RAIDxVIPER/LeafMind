@@ -148,18 +148,23 @@ class RecommendationAgent:
             raise ValueError("RecommendationAgent requires at least 'risk' and 'rag' outputs.")
 
         top_label = vision.top_label if vision else (rag.model_class or "Unknown")
-        is_healthy = "healthy" in top_label.lower()
+        is_healthy = "healthy" in top_label.lower() or (rag.reason == "healthy_class")
         is_gap_row = any("GAP" in f.tag or "GAP" in f.value or "GAP" in f.source for f in risk.factors)
         escalate = risk.escalate_to_human or (vision and (vision.escalate_to_human or not vision.can_diagnose))
 
         # 1. RAG not found path -> immediate deterministic fallback (spec 4b)
         if not rag.found:
+            fallback_reason = (
+                "healthy_class_deterministic"
+                if (is_healthy or rag.reason == "healthy_class")
+                else "rag_not_found"
+            )
             return build_fallback_recommendation(
                 vision=vision,
                 rag=rag,
                 weather=weather,
                 risk=risk,
-                fallback_reason="rag_not_found",
+                fallback_reason=fallback_reason,
                 include_doses=include_doses,
             )
 
@@ -259,12 +264,14 @@ class RecommendationAgent:
             flags.append("PROVISIONAL_SEVERITY_GAP_ROW")
         if weather and weather.weather_available:
             flags.append("WEATHER_UNVERIFIED_I14")
-        if not rag.found:
+        if is_healthy or rag.reason == "healthy_class":
+            flags.append("HEALTHY_CLASS")
+        elif not rag.found:
             flags.append("RAG_CHAPTER_NOT_FOUND")
         if escalate:
             flags.append("ESCALATE_TO_HUMAN")
         if not include_doses:
-            flags.append("DOSES_SCRUBBED")
+            flags.append("DOSES_HIDDEN")
 
         # Assemble caveats
         caveats: List[str] = []
@@ -332,5 +339,7 @@ class RecommendationAgent:
             caveats=caveats,
             rag_grounded=bool(citations),
             escalate_to_human=escalate,
-            knowledge_gap_caveated=bool(rag.kb_gap or not rag.found),
+            knowledge_gap_caveated=bool(
+                rag.kb_gap or (not rag.found and not is_healthy and rag.reason != "healthy_class")
+            ),
         )

@@ -100,13 +100,17 @@ def make_rag(
             )
         ]
 
+    reason = None
+    if not found:
+        reason = "healthy_class" if "healthy" in model_class.lower() else "no_kb_chapter"
+
     return RAGOutput(
         model_class=model_class,
         disease_name=disease_name,
         found=found,
         kb_gap=kb_gap,
         knowledge_gap_flag=kb_gap,
-        reason="no_kb_chapter" if not found else None,
+        reason=reason,
         what_it_is="Late blight is a destructive fungal-like oomycete infection.",
         why_it_happens="Caused by Phytophthora infestans favoured by cool, wet weather.",
         what_to_do_first=what_to_do_first,
@@ -446,6 +450,9 @@ class TestUncertaintyAndEscalation:
         assert rec.uncertainty_note is not None
         assert "miss" in rec.uncertainty_note.lower()
         assert any("miss" in c.lower() for c in rec.caveats)
+        assert "HEALTHY_CLASS" in rec.flags
+        assert "RAG_CHAPTER_NOT_FOUND" not in rec.flags
+        assert rec.fallback_reason == "healthy_class_deterministic"
 
 
 # ── RAG Not Found & Squash Powdery Mildew Tests ────────────────────────────────
@@ -589,6 +596,190 @@ class TestDoseHidingAndScrubbing:
             include_doses=False,
         )
 
-        assert "DOSES_SCRUBBED" in rec.flags
+        assert "DOSES_HIDDEN" in rec.flags
         assert "2.5 g/L" not in rec.what_to_do_first
         assert "2.5 g/L" not in " ".join(rec.steps)
+
+
+# ── C6 Hardening Tests ─────────────────────────────────────────────────────────
+
+class TestC6Hardening:
+    def test_ungrounded_spray_interval_rejected(self):
+        """LLM output containing 'spray every 7 days' with no such phrase in input -> rejected -> fallback."""
+        hallucinated_response = json.dumps({
+            "summary": "Late blight detected. Spray every 7 days to maintain control.",
+            "what_to_do_first": "Remove infected leaves.",
+            "steps": ["Spray every 7 days."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider = MockLLMProvider(handler=hallucinated_response)
+        agent = RecommendationAgent(provider=provider)
+
+        rec = agent.recommend(
+            vision=make_vision(),
+            rag=make_rag(what_to_do_first="Remove infected leaves immediately."),
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+
+        assert rec.llm_used is False
+        assert rec.fallback_reason is not None
+        assert "validation_failed" in rec.fallback_reason
+        assert "ungrounded_number" in rec.fallback_reason
+
+    def test_grounded_interval_number_accepted(self):
+        """LLM output containing '7' where the input also has '7 days' in RAG text -> accepted."""
+        rag = make_rag(
+            model_class="Tomato___Late_blight",
+            what_to_do_first="Remove infected leaves and repeat protective spray every 7 days.",
+        )
+        valid_response = json.dumps({
+            "summary": "Identified Late blight. Repeat protective spray every 7 days.",
+            "what_to_do_first": "Remove infected leaves and repeat protective spray every 7 days.",
+            "steps": ["Repeat protective spray every 7 days."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider = MockLLMProvider(handler=valid_response)
+        agent = RecommendationAgent(provider=provider)
+
+        rec = agent.recommend(
+            vision=make_vision(),
+            rag=rag,
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+
+        assert rec.llm_used is True
+        assert rec.fallback_reason is None
+        assert "7" in rec.summary
+        assert "every 7 days" in rec.summary
+
+    def test_made_up_number_percentage_rejected(self):
+        """LLM output containing a made-up number (e.g. '30 %') not in input -> rejected -> fallback."""
+        hallucinated_response = json.dumps({
+            "summary": "Late blight detected with 30 % likelihood of rapid spread.",
+            "what_to_do_first": "Remove infected foliage.",
+            "steps": ["Prune lower leaves."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider = MockLLMProvider(handler=hallucinated_response)
+        agent = RecommendationAgent(provider=provider)
+
+        rec = agent.recommend(
+            vision=make_vision(),
+            rag=make_rag(),
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+
+        assert rec.llm_used is False
+        assert rec.fallback_reason is not None
+        assert "validation_failed" in rec.fallback_reason
+        assert "ungrounded_number" in rec.fallback_reason
+        assert "30" in rec.fallback_reason
+
+    def test_step_indices_accepted(self):
+        """Step indices (1., 2., 3.) in LLM output are accepted and not rejected as ungrounded numbers."""
+        valid_response = json.dumps({
+            "summary": "Identified Late blight with severe risk. Immediate foliage sanitation is recommended.",
+            "what_to_do_first": "1. Remove and destroy all infected foliage immediately.",
+            "steps": [
+                "1. Remove and destroy all infected foliage immediately.",
+                "2. Ensure adequate plant spacing to improve airflow.",
+                "3. Avoid overhead irrigation to minimize leaf wetness.",
+            ],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider = MockLLMProvider(handler=valid_response)
+        agent = RecommendationAgent(provider=provider)
+
+        rec = agent.recommend(
+            vision=make_vision(),
+            rag=make_rag(),
+            weather=make_weather(),
+            risk=make_risk(risk_level="severe"),
+        )
+
+        assert rec.llm_used is True
+        assert rec.fallback_reason is None
+        assert len(rec.steps) == 3
+
+    def test_urgency_numbers_grounding(self):
+        """Urgency within_24h allows '24 hours'; a made-up '72 hours' with within_24h is rejected."""
+        # Case A: within_24h allows 24 hours
+        valid_response = json.dumps({
+            "summary": "Late blight detected with severe risk. Take immediate action within 24 hours.",
+            "what_to_do_first": "Remove infected leaves within 24 hours.",
+            "steps": ["Remove infected leaves within 24 hours."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider = MockLLMProvider(handler=valid_response)
+        agent = RecommendationAgent(provider=provider)
+
+        rec_valid = agent.recommend(
+            vision=make_vision(),
+            rag=make_rag(),
+            weather=make_weather(),
+            risk=make_risk(risk_level="severe"),  # maps to within_24h
+        )
+        assert rec_valid.llm_used is True
+        assert rec_valid.fallback_reason is None
+        assert "24" in rec_valid.summary
+
+        # Case B: made-up 72 hours when urgency is within_24h is rejected
+        hallucinated_response = json.dumps({
+            "summary": "Late blight detected with severe risk. Take action within 72 hours.",
+            "what_to_do_first": "Remove infected leaves within 72 hours.",
+            "steps": ["Remove leaves within 72 hours."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        provider_bad = MockLLMProvider(handler=hallucinated_response)
+        agent_bad = RecommendationAgent(provider=provider_bad)
+
+        rec_bad = agent_bad.recommend(
+            vision=make_vision(),
+            rag=make_rag(),
+            weather=make_weather(),
+            risk=make_risk(risk_level="severe"),  # maps to within_24h
+        )
+        assert rec_bad.llm_used is False
+        assert rec_bad.fallback_reason is not None
+        assert "validation_failed" in rec_bad.fallback_reason
+        assert "ungrounded_number" in rec_bad.fallback_reason
+        assert "72" in rec_bad.fallback_reason
+
+    def test_healthy_class_and_squash_flags_and_reasons(self):
+        """Healthy class uses HEALTHY_CLASS flag and healthy_class_deterministic reason; Squash retains RAG_CHAPTER_NOT_FOUND."""
+        agent = RecommendationAgent(provider=MockLLMProvider("{}"))
+
+        # Healthy class case
+        rec_healthy = agent.recommend(
+            vision=make_vision(top_label="Tomato___healthy", confidence=0.97),
+            rag=make_rag(model_class="Tomato___healthy", found=False, disease_name="Healthy Tomato"),
+            weather=make_weather(),
+            risk=make_risk(risk_level="low", risk_score=0.0),
+        )
+        assert rec_healthy.llm_used is False
+        assert rec_healthy.fallback_reason == "healthy_class_deterministic"
+        assert "HEALTHY_CLASS" in rec_healthy.flags
+        assert "RAG_CHAPTER_NOT_FOUND" not in rec_healthy.flags
+        assert rec_healthy.urgency == "monitor"
+
+        # Squash real gap case
+        rec_squash = agent.recommend(
+            vision=make_vision(top_label="Squash___Powdery_mildew", can_diagnose=False),
+            rag=make_rag(model_class="Squash___Powdery_mildew", found=False, kb_gap=True),
+            weather=make_weather(),
+            risk=make_risk(risk_level="moderate", is_gap_row=True, escalate_to_human=True),
+        )
+        assert rec_squash.llm_used is False
+        assert rec_squash.fallback_reason == "rag_not_found"
+        assert "RAG_CHAPTER_NOT_FOUND" in rec_squash.flags
+        assert "HEALTHY_CLASS" not in rec_squash.flags
+        assert rec_squash.urgency == "consult_agronomist"

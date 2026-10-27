@@ -58,6 +58,7 @@ def build_recommendation_prompt(
     weather: Optional[WeatherOutput],
     risk: RiskOutput,
     include_doses: bool = False,
+    urgency: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     Construct the system prompt and user prompt for the recommendation LLM.
@@ -68,10 +69,15 @@ def build_recommendation_prompt(
         weather: Optional WeatherOutput from weather agent.
         risk: RiskOutput from risk agent.
         include_doses: Whether chemical doses are permitted (D23/D28).
+        urgency: Optional urgency level string (e.g. 'within_24h').
 
     Returns:
         Dict with "system_prompt" and "prompt".
     """
+    if urgency is None:
+        from src.recommendation.fallback import map_urgency
+        urgency = map_urgency(risk=risk, rag=rag, vision=vision)
+
     lines: List[str] = []
 
     # 1. Vision & Diagnostic Context
@@ -97,6 +103,7 @@ def build_recommendation_prompt(
     lines.append(f"Risk Score: {risk.risk_score:.2f}")
     lines.append(f"Escalate to Human: {risk.escalate_to_human}")
     lines.append(f"Uncertainty Level: {risk.uncertainty_level}")
+    lines.append(f"Recommended Urgency: {urgency}")
     if risk.uncertainty_signals_triggered:
         lines.append(f"Triggered Uncertainty Signals: {', '.join(risk.uncertainty_signals_triggered)}")
 

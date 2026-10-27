@@ -97,9 +97,13 @@ def build_fallback_recommendation(
         RecommendationOutput instance with llm_used=False.
     """
     top_label = vision.top_label if vision else (rag.model_class or "Unknown")
-    is_healthy = "healthy" in top_label.lower()
+    is_healthy = "healthy" in top_label.lower() or (rag.reason == "healthy_class")
     is_gap_row = any("GAP" in f.tag or "GAP" in f.value or "GAP" in f.source for f in risk.factors)
     escalate = risk.escalate_to_human or (vision and (vision.escalate_to_human or not vision.can_diagnose))
+
+    # Normalize fallback reason for healthy class
+    if (is_healthy or rag.reason == "healthy_class") and fallback_reason == "rag_not_found":
+        fallback_reason = "healthy_class_deterministic"
 
     # 1. Map urgency
     urgency = map_urgency(risk=risk, rag=rag, vision=vision)
@@ -110,12 +114,14 @@ def build_fallback_recommendation(
         flags.append("PROVISIONAL_SEVERITY_GAP_ROW")
     if weather and weather.weather_available:
         flags.append("WEATHER_UNVERIFIED_I14")
-    if not rag.found:
+    if is_healthy or rag.reason == "healthy_class":
+        flags.append("HEALTHY_CLASS")
+    elif not rag.found:
         flags.append("RAG_CHAPTER_NOT_FOUND")
     if escalate:
         flags.append("ESCALATE_TO_HUMAN")
     if not include_doses:
-        flags.append("DOSES_SCRUBBED")
+        flags.append("DOSES_HIDDEN")
 
     # 3. Build caveats
     caveats: List[str] = []
@@ -135,7 +141,7 @@ def build_fallback_recommendation(
         caveats.append(
             "Automated treatment advice is not confirmed for this case. Expert agronomist verification is required."
         )
-    if not rag.found:
+    if not rag.found and not is_healthy and rag.reason != "healthy_class":
         caveats.append(
             "Knowledge base chapter was not found for this class. Automatic treatment advice unavailable."
         )
@@ -260,5 +266,7 @@ def build_fallback_recommendation(
         caveats=caveats,
         rag_grounded=bool(rag.found and citations),
         escalate_to_human=escalate,
-        knowledge_gap_caveated=bool(rag.kb_gap or not rag.found),
+        knowledge_gap_caveated=bool(
+            rag.kb_gap or (not rag.found and not is_healthy and rag.reason != "healthy_class")
+        ),
     )
