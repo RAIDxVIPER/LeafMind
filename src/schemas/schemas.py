@@ -498,6 +498,11 @@ class MonitoringOutput(BaseModel):
         "the training data. PPT claim of '% change in affected area' is unsupported by current data.",
         description="Mandatory explanation accompanying severity_delta_pct=null"
     )
+    plant_identity_note: str = Field(
+        "The system CANNOT verify that follow-up images show the same physical plant or leaf "
+        "[ENG limitation — no plant biometrics model exists].",
+        description="Disclaimer that physical plant identity is unverified"
+    )
     same_image_flag: bool = False
     poor_quality_flag: bool = False
     crop_mismatch_flag: bool = False

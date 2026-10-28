@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
+from src.agents.monitoring_agent import MonitoringAgent
 from src.agents.recommendation_agent import RecommendationAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.vision_agent import VisionAgent
@@ -36,6 +37,7 @@ def create_orchestrator_graph(
     rag_agent: Optional[RAGAgent] = None,
     risk_agent: Optional[RiskAgent] = None,
     recommendation_agent: Optional[RecommendationAgent] = None,
+    monitoring_agent: Optional[MonitoringAgent] = None,
     checkpointer: Optional[BaseCheckpointSaver] = None,
     use_memory: bool = False,
     db_path: Optional[str | Path] = None,
@@ -51,6 +53,7 @@ def create_orchestrator_graph(
         rag_agent: Optional RAGAgent instance (real or mock)
         risk_agent: Optional RiskAgent instance (real or mock)
         recommendation_agent: Optional RecommendationAgent instance (real or mock)
+        monitoring_agent: Optional MonitoringAgent instance (real or mock)
         checkpointer: Pre-configured BaseCheckpointSaver or None
         use_memory: If True, uses MemorySaver (fast unit tests)
         db_path: Path to SQLite DB for checkpointing
@@ -66,6 +69,7 @@ def create_orchestrator_graph(
         rag_agent=rag_agent,
         risk_agent=risk_agent,
         recommendation_agent=recommendation_agent,
+        monitoring_agent=monitoring_agent,
         case_store_dir=case_store_dir,
         config_path=config_path,
     )

@@ -215,55 +215,77 @@ def evaluate_escalation(
     # T8–T11: Monitoring Triggers (Evaluated if MonitoringOutput present)
     # ─────────────────────────────────────────────────────────────────────────
     if monitoring is not None:
-        # T8: different disease detected at follow-up
-        if monitoring.disease_status == "different_disease_detected_at_followup":
+        # Same image resubmission (Spec 4c-iii / 4c-vi / C8 Fix Pass)
+        # Duplicate images must not count as disease persistence: T9 and T10 must NOT fire.
+        # Only SAME_IMAGE (and applicable non-monitoring triggers) may fire.
+        if monitoring.same_image_flag:
             add_trigger(
-                "T8",
-                "Monitoring: different disease detected at follow-up visit [ENG]",
-                "urgent",
-                val=monitoring.disease_status,
-                thresh="different_disease_detected_at_followup",
-            )
-
-        # T9: same disease persists
-        if monitoring.disease_status == "same_disease_still_detected":
-            curr_visit = monitoring.visit_number or visit_number
-            if curr_visit >= extended_thresh:
-                add_trigger(
-                    "T9",
-                    f"Monitoring: disease persists through extended visit {curr_visit} >= {extended_thresh} [ENG]",
-                    "urgent",
-                    val=curr_visit,
-                    thresh=extended_thresh,
-                )
-            elif curr_visit >= persist_thresh:
-                add_trigger(
-                    "T9",
-                    f"Monitoring: disease persists through visit {curr_visit} >= {persist_thresh} [ENG]",
-                    "high",
-                    val=curr_visit,
-                    thresh=persist_thresh,
-                )
-
-        # T10: poor quality on follow-up
-        if monitoring.poor_quality_flag:
-            add_trigger(
-                "T10",
-                "Monitoring: poor quality follow-up image [ENG]",
+                "SAME_IMAGE",
+                "Monitoring: identical image resubmitted from baseline visit [ENG]",
                 "medium",
                 val=True,
                 thresh=True,
             )
+        else:
+            # T8: different disease detected at follow-up
+            # Must NOT fire on crop mismatch, poor quality, or same image
+            if (
+                monitoring.disease_status == "different_disease_detected_at_followup"
+                and not monitoring.crop_mismatch_flag
+                and not monitoring.poor_quality_flag
+            ):
+                add_trigger(
+                    "T8",
+                    "Monitoring: different disease detected at follow-up visit [ENG]",
+                    "urgent",
+                    val=monitoring.disease_status,
+                    thresh="different_disease_detected_at_followup",
+                )
 
-        # T11: crop mismatch
-        if monitoring.crop_mismatch_flag:
-            add_trigger(
-                "T11",
-                "Monitoring: crop mismatch detected between baseline and follow-up [ENG]",
-                "high",
-                val=True,
-                thresh=True,
-            )
+            # T9: same disease persists
+            # Must NOT fire on crop mismatch, poor quality, or same image
+            if (
+                monitoring.disease_status == "same_disease_still_detected"
+                and not monitoring.crop_mismatch_flag
+                and not monitoring.poor_quality_flag
+            ):
+                curr_visit = monitoring.visit_number or visit_number
+                if curr_visit >= extended_thresh:
+                    add_trigger(
+                        "T9",
+                        f"Monitoring: disease persists through extended visit {curr_visit} >= {extended_thresh} [ENG]",
+                        "urgent",
+                        val=curr_visit,
+                        thresh=extended_thresh,
+                    )
+                elif curr_visit >= persist_thresh:
+                    add_trigger(
+                        "T9",
+                        f"Monitoring: disease persists through visit {curr_visit} >= {persist_thresh} [ENG]",
+                        "high",
+                        val=curr_visit,
+                        thresh=persist_thresh,
+                    )
+
+            # T10: poor quality on follow-up
+            if monitoring.poor_quality_flag:
+                add_trigger(
+                    "T10",
+                    "Monitoring: poor quality follow-up image [ENG]",
+                    "medium",
+                    val=True,
+                    thresh=True,
+                )
+
+            # T11: crop mismatch
+            if monitoring.crop_mismatch_flag:
+                add_trigger(
+                    "T11",
+                    "Monitoring: crop mismatch detected between baseline and follow-up [ENG]",
+                    "high",
+                    val=True,
+                    thresh=True,
+                )
 
     # ─────────────────────────────────────────────────────────────────────────
     # Final Priority & Escalation Decision

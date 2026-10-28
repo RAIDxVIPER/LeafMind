@@ -163,6 +163,13 @@ def load_case_record(
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        if isinstance(data, dict) and "initial_request" in data and isinstance(data["initial_request"], dict):
+            img_b64 = data["initial_request"].get("image_bytes")
+            if isinstance(img_b64, str):
+                try:
+                    data["initial_request"]["image_bytes"] = base64.b64decode(img_b64)
+                except Exception:
+                    pass
         return CaseState.model_validate(data)
     except Exception as e:
         logger.error("Failed to parse CaseState record at %s: %s", file_path, e)

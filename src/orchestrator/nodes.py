@@ -23,6 +23,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 import uuid
 
+from src.agents.monitoring_agent import MonitoringAgent
 from src.agents.recommendation_agent import RecommendationAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.vision_agent import VisionAgent
@@ -43,6 +44,7 @@ from src.schemas.schemas import (
     CaseState,
     FarmerRequest,
     FarmerResponse,
+    FollowUpRecord,
     HumanEscalationPayload,
     ImageQualityFlags,
     MonitoringOutput,
@@ -71,6 +73,7 @@ class OrchestratorNodes:
         rag_agent: Optional[RAGAgent] = None,
         risk_agent: Optional[RiskAgent] = None,
         recommendation_agent: Optional[RecommendationAgent] = None,
+        monitoring_agent: Optional[MonitoringAgent] = None,
         case_store_dir: Optional[str | Path] = None,
         config_path: Optional[str | Path] = None,
     ) -> None:
@@ -79,6 +82,7 @@ class OrchestratorNodes:
         self.rag_agent = rag_agent
         self.risk_agent = risk_agent
         self.recommendation_agent = recommendation_agent
+        self.monitoring_agent = monitoring_agent
         self.case_store_dir = case_store_dir
         self.config_path = config_path
 
@@ -120,6 +124,11 @@ class OrchestratorNodes:
         if self.recommendation_agent is None:
             self.recommendation_agent = RecommendationAgent()
         return self.recommendation_agent
+
+    def get_monitoring_agent(self) -> MonitoringAgent:
+        if self.monitoring_agent is None:
+            self.monitoring_agent = MonitoringAgent()
+        return self.monitoring_agent
 
     # ─────────────────────────────────────────────────────────────────────────
     # 1. input_validator
@@ -186,32 +195,45 @@ class OrchestratorNodes:
     def case_loader(self, state: LeafMindState) -> Dict[str, Any]:
         """Load existing CaseState on the follow-up path."""
         t0 = time.perf_counter()
-        c_id = state.get("case_id")
-        if not c_id:
-            err = "Case ID not recognized. Please submit a new request or check your case ID."
+        prev_id = state.get("previous_case_id") or state.get("case_id")
+        curr_case_id = state.get("case_id")
+        if not curr_case_id or (prev_id and curr_case_id == str(prev_id)):
+            curr_case_id = str(uuid.uuid4())
+
+        sub_at = state.get("submitted_at") or datetime.now(timezone.utc)
+
+        if not prev_id:
+            logger.warning("Follow-up requested but no previous_case_id or case_id provided; degrading gracefully.")
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
             return {
-                "fatal_error": "case_not_found",
-                "errors": {"case_loader": err},
+                "case_id": curr_case_id,
+                "submitted_at": sub_at,
+                "loaded_case_state": None,
+                "flags": ["PREVIOUS_CASE_NOT_SPECIFIED"],
+                "partial_result": True,
                 "node_timings_ms": {"case_loader": elapsed},
-                "flags": ["CASE_NOT_FOUND"],
             }
 
-        loaded_case = load_case_record(c_id, case_store_dir=self.case_store_dir)
+        loaded_case = load_case_record(prev_id, case_store_dir=self.case_store_dir)
         if loaded_case is None:
-            err = f"Case ID '{c_id}' not found in persistence store."
+            logger.warning("Previous case record '%s' not found or corrupt; degrading gracefully.", prev_id)
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
             return {
-                "fatal_error": "case_not_found",
-                "errors": {"case_loader": err},
+                "case_id": curr_case_id,
+                "submitted_at": sub_at,
+                "loaded_case_state": None,
+                "flags": ["PREVIOUS_CASE_NOT_FOUND"],
+                "partial_result": True,
                 "node_timings_ms": {"case_loader": elapsed},
-                "flags": ["CASE_NOT_FOUND"],
             }
 
         elapsed = round((time.perf_counter() - t0) * 1000, 2)
+        f_id = state.get("farmer_id") or loaded_case.farmer_id
         return {
+            "case_id": curr_case_id,
+            "farmer_id": f_id,
+            "submitted_at": sub_at,
             "loaded_case_state": loaded_case,
-            "farmer_id": loaded_case.farmer_id,
             "crop": state.get("crop") or loaded_case.crop_type,
             "node_timings_ms": {"case_loader": elapsed},
         }
@@ -375,20 +397,66 @@ class OrchestratorNodes:
         }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 9. monitoring_runner (Stage C8 no-op slot)
+    # 9. monitoring_runner (Stage C8)
     # ─────────────────────────────────────────────────────────────────────────
     def monitoring_runner(self, state: LeafMindState) -> Dict[str, Any]:
         """
-        Stage C8 Monitoring slot.
-        C8 is not yet implemented: this is a clearly marked no-op slot that passes
-        history=None and does NOT invent history.
+        Stage C8 Monitoring runner.
+        Evaluates change between follow-up visit and baseline case.
         """
         t0 = time.perf_counter()
-        elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        return {
-            "monitoring_output": None,
-            "node_timings_ms": {"monitoring_runner": elapsed},
-        }
+        loaded_case = state.get("loaded_case_state")
+        v_out = state.get("vision_output")
+
+        if loaded_case is None or v_out is None:
+            elapsed = round((time.perf_counter() - t0) * 1000, 2)
+            return {
+                "monitoring_output": None,
+                "node_timings_ms": {"monitoring_runner": elapsed},
+            }
+
+        try:
+            agent = self.get_monitoring_agent()
+            img_bytes = state.get("image_bytes")
+            crop = state.get("crop")
+            sub_at = state.get("submitted_at")
+
+            m_out: MonitoringOutput = agent.evaluate(
+                current_vision=v_out,
+                baseline_case=loaded_case,
+                current_image_bytes=img_bytes,
+                current_crop=crop,
+                current_submitted_at=sub_at,
+            )
+
+            new_flags = ["PLANT_IDENTITY_UNVERIFIED"]
+            if m_out.same_image_flag:
+                new_flags.append("SAME_IMAGE_RESUBMISSION")
+            if m_out.poor_quality_flag:
+                new_flags.append("POOR_QUALITY_FOLLOWUP")
+            if m_out.crop_mismatch_flag:
+                new_flags.append("CROP_MISMATCH")
+            if m_out.too_soon_flag:
+                new_flags.append("FOLLOWUP_TOO_SOON")
+
+            elapsed = round((time.perf_counter() - t0) * 1000, 2)
+            return {
+                "monitoring_output": m_out,
+                "flags": new_flags,
+                "escalate_to_human": m_out.escalate_to_human,
+                "node_timings_ms": {"monitoring_runner": elapsed},
+            }
+        except Exception as e:
+            sanitized = sanitize_error(e)
+            logger.warning("Monitoring Agent failed; degrading gracefully: %s", sanitized)
+            elapsed = round((time.perf_counter() - t0) * 1000, 2)
+            return {
+                "monitoring_output": None,
+                "flags": ["MONITORING_FAILED"],
+                "partial_result": True,
+                "errors": {"monitoring_runner": sanitized},
+                "node_timings_ms": {"monitoring_runner": elapsed},
+            }
 
     # ─────────────────────────────────────────────────────────────────────────
     # 10. risk_reason_runner
@@ -399,6 +467,19 @@ class OrchestratorNodes:
         v_out = state.get("vision_output")
         w_out = state.get("weather_output")
         r_out = state.get("rag_output")
+        m_out = state.get("monitoring_output")
+
+        # History status is passed only if monitoring evaluated a plausible case.
+        # If crop mismatch, same image resubmission, poor quality, or unknown status: history=None.
+        m_status = None
+        if (
+            m_out is not None
+            and not m_out.crop_mismatch_flag
+            and not m_out.same_image_flag
+            and not m_out.poor_quality_flag
+            and m_out.disease_status != "unknown"
+        ):
+            m_status = m_out.disease_status
 
         try:
             agent = self.get_risk_agent()
@@ -406,7 +487,7 @@ class OrchestratorNodes:
                 vision=v_out,
                 weather=w_out,
                 rag=r_out,
-                monitoring_disease_status=None,  # First visit / C7 no-op
+                monitoring_disease_status=m_status,
             )
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
             return {
@@ -496,14 +577,16 @@ class OrchestratorNodes:
     def escalation_router(self, state: LeafMindState) -> Dict[str, Any]:
         """Evaluate escalation triggers T1–T11 and route accordingly."""
         t0 = time.perf_counter()
+        m_out = state.get("monitoring_output")
+        visit_num = m_out.visit_number if m_out else 1
         esc_summary: EscalationSummary = evaluate_escalation(
             vision=state.get("vision_output"),
             rag=state.get("rag_output"),
             weather=state.get("weather_output"),
             risk=state.get("risk_output"),
             recommendation=state.get("recommendation_output"),
-            monitoring=state.get("monitoring_output"),
-            visit_number=1,
+            monitoring=m_out,
+            visit_number=visit_num,
             config_path=self.config_path,
             image_bytes=state.get("image_bytes"),
             case_id=state.get("case_id"),
@@ -626,6 +709,7 @@ class OrchestratorNodes:
             submitted_at=sub_at,
             crop=crop,
             is_followup=is_followup,
+            previous_case_id=state.get("previous_case_id"),
             vision=vision_summary,
             weather=weather_summary,
             rag=rag_summary,
@@ -680,12 +764,30 @@ class OrchestratorNodes:
         f_id = state.get("farmer_id") or "farmer_001"
         sub_at = state.get("submitted_at") or datetime.now(timezone.utc)
         crop = state.get("crop")
+        is_followup = bool(state.get("is_followup", False))
 
         v_out = state.get("vision_output")
         w_out = state.get("weather_output")
         r_out = state.get("rag_output")
         rk_out = state.get("risk_output")
         rec_out = state.get("recommendation_output")
+
+        # Check if this was a follow-up visit with loaded baseline
+        loaded_case = state.get("loaded_case_state")
+        mon_out = state.get("monitoring_output")
+
+        if loaded_case is not None and mon_out is not None and rk_out is not None and rec_out is not None:
+            fu_record = FollowUpRecord(
+                visit_number=mon_out.visit_number,
+                submitted_at=sub_at,
+                monitoring_output=mon_out,
+                risk_output=rk_out,
+                recommendation_output=rec_out,
+            )
+            loaded_case.follow_ups.append(fu_record)
+            if state.get("escalate_to_human"):
+                loaded_case.status = "escalated"
+            save_case_record(loaded_case, case_store_dir=self.case_store_dir)
 
         if v_out and w_out and r_out and rk_out and rec_out and c_uuid:
             req = state.get("farmer_request") or FarmerRequest(
@@ -694,7 +796,7 @@ class OrchestratorNodes:
                 image_mime_type="image/jpeg",
                 crop_type=crop,
                 submitted_at=sub_at,
-                is_followup=False,
+                is_followup=is_followup,
                 case_id=c_uuid,
             )
             case_state = CaseState(

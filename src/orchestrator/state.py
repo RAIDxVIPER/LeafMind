@@ -188,6 +188,7 @@ class FinalResponse(BaseModel):
     submitted_at: datetime
     crop: Optional[str] = None
     is_followup: bool = False
+    previous_case_id: Optional[str] = None
 
     # Core agent outputs
     vision: Optional[VisionSummary] = None
@@ -248,6 +249,7 @@ class LeafMindState(TypedDict, total=False):
 
     # ── Case Identity ──────────────────────────────────────────────────
     case_id: Optional[str]               # str(UUID4)
+    previous_case_id: Optional[str]      # str(UUID4) of baseline case for follow-up (C8)
     farmer_id: Optional[str]
     submitted_at: Optional[datetime]
 

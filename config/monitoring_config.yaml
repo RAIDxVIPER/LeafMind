@@ -1,0 +1,24 @@
+# =============================================================================
+# LeafMind — Monitoring Configuration (Stage C8)
+# =============================================================================
+# Configuration for follow-up case monitoring, plausibility checks, and delta logic.
+
+timing:
+  too_soon_days: 1                      # [ENG assumption] Same-day follow-up flagged as too_soon
+
+plausibility:
+  check_same_image: true                # [ENG assumption] MD5 hash match triggers same_image_flag
+  check_image_quality: true             # [ENG assumption] Low-res or blurry flags trigger poor_quality_flag
+  check_crop_mismatch: true             # [ENG assumption] Crop prefix or crop mismatch triggers crop_mismatch_flag
+
+escalation:
+  persistent_disease_min_visits: 2      # [ENG assumption] T9 high priority visit threshold
+  extended_persistence_min_visits: 3    # [ENG assumption] T9 urgent priority visit threshold
+
+disclaimers:
+  plant_identity_unverified_note: >-
+    The system CANNOT verify that follow-up images show the same physical plant or leaf
+    [ENG limitation — no plant biometrics model exists].
+  severity_note: >-
+    Numeric severity delta is not computable. No per-leaf severity labels or masks exist in
+    the training data. PPT claim of '% change in affected area' is unsupported by current data.

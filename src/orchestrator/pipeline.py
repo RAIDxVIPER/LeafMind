@@ -21,6 +21,7 @@ import uuid
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from src.agents.monitoring_agent import MonitoringAgent
 from src.agents.recommendation_agent import RecommendationAgent
 from src.agents.risk_agent import RiskAgent
 from src.agents.vision_agent import VisionAgent
@@ -44,11 +45,13 @@ def run_case(
     case_id: Optional[Union[str, uuid.UUID]] = None,
     farmer_id: Optional[str] = "farmer_001",
     is_followup: bool = False,
+    previous_case_id: Optional[Union[str, uuid.UUID]] = None,
     vision_agent: Optional[VisionAgent] = None,
     weather_agent: Optional[WeatherAgent] = None,
     rag_agent: Optional[RAGAgent] = None,
     risk_agent: Optional[RiskAgent] = None,
     recommendation_agent: Optional[RecommendationAgent] = None,
+    monitoring_agent: Optional[MonitoringAgent] = None,
     checkpointer: Optional[BaseCheckpointSaver] = None,
     use_memory: bool = False,
     db_path: Optional[Union[str, Path]] = None,
@@ -106,6 +109,9 @@ def run_case(
     case_id_str = str(case_uuid)
 
     now_utc = datetime.now(timezone.utc)
+    if previous_case_id:
+        is_followup = True
+    prev_case_id_str = str(previous_case_id) if previous_case_id else None
 
     # 3. Compile graph
     compiled_graph = create_orchestrator_graph(
@@ -114,6 +120,7 @@ def run_case(
         rag_agent=rag_agent,
         risk_agent=risk_agent,
         recommendation_agent=recommendation_agent,
+        monitoring_agent=monitoring_agent,
         checkpointer=checkpointer,
         use_memory=use_memory,
         db_path=db_path,
@@ -128,6 +135,7 @@ def run_case(
         "location": location,
         "include_doses": include_doses,
         "case_id": case_id_str,
+        "previous_case_id": prev_case_id_str,
         "farmer_id": farmer_id or "farmer_001",
         "submitted_at": now_utc,
         "is_followup": is_followup,
