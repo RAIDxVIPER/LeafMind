@@ -153,8 +153,8 @@ def test_streamlit_app_handles_escalated_safe_stub_response(mock_meta_data, mock
     escalated_data["escalation"] = {
         "escalate_to_human": True,
         "priority": "high",
-        "triggered_triggers": ["T6_SINGLE_CLASS_CROP"],
-        "reasons": [{"trigger_id": "T6", "description": "Single class crop"}],
+        "triggered_triggers": ["SINGLE_CLASS_CROP"],
+        "reasons": [{"trigger_id": "SINGLE_CLASS_CROP", "description": "Single class crop"}],
         "payload": {
             "case_id": "4a28f891-944a-4a4f-9e79-5098ef6c3b99",
             "farmer_id": "farmer_001",
@@ -183,7 +183,8 @@ def test_streamlit_app_handles_escalated_safe_stub_response(mock_meta_data, mock
 
 def test_streamlit_app_handles_followup_monitoring_response(mock_meta_data, mock_analysis_result):
     """
-    Verify AppTest handles a follow-up response with monitoring trajectory delta cleanly.
+    Verify AppTest handles a follow-up response with monitoring trajectory delta cleanly,
+    asserting strictly neutral wording and zero improvement/worsening claims.
     """
     followup_data = dict(mock_analysis_result)
     followup_data["is_followup"] = True
@@ -215,4 +216,65 @@ def test_streamlit_app_handles_followup_monitoring_response(mock_meta_data, mock
         at.run(timeout=10)
 
         assert len(at.exception) == 0
+        # Check rendered text for neutral language and absence of recovery/improvement/worsening claims
+        all_elements = list(at.info) + list(at.metric) + list(at.markdown) + list(at.caption)
+        all_rendered_text = " ".join([
+            str(getattr(el, "value", ""))
+            for el in all_elements
+        ]).lower()
+
+        assert "the same disease was detected again" in all_rendered_text
+        assert "recover" not in all_rendered_text
+        assert "improv" not in all_rendered_text
+        assert "worsen" not in all_rendered_text
+
+
+def test_streamlit_all_5_disease_statuses_strictly_neutral(mock_meta_data, mock_analysis_result):
+    """
+    Assert that all 5 monitoring disease_status values produce neutral, non-efficacy text in the UI
+    and never produce words like recover, improv, or worsen.
+    """
+    valid_statuses = [
+        "same_disease_still_detected",
+        "no_disease_detected_at_followup",
+        "different_disease_detected_at_followup",
+        "not_applicable_healthy_baseline",
+        "unknown",
+    ]
+
+    for status_val in valid_statuses:
+        followup_data = dict(mock_analysis_result)
+        followup_data["is_followup"] = True
+        followup_data["monitoring"] = {
+            "case_id": "4a28f891-944a-4a4f-9e79-5098ef6c3b99",
+            "visit_number": 2,
+            "baseline_label": "Tomato___Early_blight",
+            "baseline_confidence": 0.82,
+            "followup_label": "Tomato___Early_blight",
+            "followup_confidence": 0.75,
+            "label_same": True,
+            "disease_still_detected": True,
+            "new_label_is_healthy": False,
+            "confidence_raw_delta": 0.0,
+            "disease_status": status_val,
+            "same_image_flag": False,
+            "poor_quality_flag": False,
+            "crop_mismatch_flag": False,
+            "too_soon_flag": False,
+            "escalate_to_human": False,
+        }
+
+        with patch("streamlit_app.app.fetch_health", return_value={"status": "ok", "version": "0.1.0"}), \
+             patch("streamlit_app.app.fetch_meta", return_value=mock_meta_data):
+
+            at = AppTest.from_file("streamlit_app/app.py")
+            at.session_state["current_analysis"] = followup_data
+            at.run(timeout=10)
+
+            assert len(at.exception) == 0
+            info_texts = " ".join([str(i.value) for i in at.info]).lower()
+            assert "recover" not in info_texts
+            assert "improv" not in info_texts
+            assert "worsen" not in info_texts
+
 

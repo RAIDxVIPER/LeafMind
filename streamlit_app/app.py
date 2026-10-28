@@ -339,10 +339,18 @@ def main():
         st.markdown("### 🔄 Follow-Up Monitoring Delta")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            status = mon.get("disease_status", "unknown").upper()
-            delta = mon.get("confidence_delta", 0.0)
-            st.metric(label="Disease Trajectory Status", value=status)
-            st.metric(label="Confidence Delta", value=f"{delta:+.1%}")
+            raw_status = mon.get("disease_status", "unknown")
+            neutral_desc = {
+                "same_disease_still_detected": "the same disease was detected again",
+                "no_disease_detected_at_followup": "no disease was detected this time",
+                "different_disease_detected_at_followup": "a different disease was detected",
+                "not_applicable_healthy_baseline": "not applicable (healthy baseline)",
+                "unknown": "comparison not possible",
+            }.get(raw_status, "comparison not possible")
+            delta = mon.get("confidence_raw_delta", mon.get("confidence_delta", 0.0))
+            st.metric(label="Follow-Up Disease Status", value=raw_status)
+            st.info(f"**Follow-Up Observation:** {neutral_desc.capitalize()}")
+            st.metric(label="Classifier Confidence Delta (non-efficacy)", value=f"{delta:+.1%}")
         with col_m2:
             st.markdown("**Plausibility Checks:**")
             st.markdown(f"- Identical Photo: `{'YES' if mon.get('same_image_flag') else 'NO'}`")

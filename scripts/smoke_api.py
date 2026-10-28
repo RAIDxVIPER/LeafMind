@@ -20,10 +20,11 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 
@@ -31,6 +32,52 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 API_HOST = "127.0.0.1"
 API_PORT = 8005
 BASE_URL = f"http://{API_HOST}:{API_PORT}"
+
+
+def extract_risk_breakdown(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract T, W, H and recompute R = 0.70*T + 0.20*W + 0.10*H."""
+    risk = data.get("risk", {})
+    r_api = risk.get("risk_score")
+    if r_api is None:
+        return {}
+
+    t_score = 0.0
+    w_score = 0.0
+    h_score = 0.0
+
+    for f in risk.get("factors", []):
+        src = f.get("source", "")
+        val_str = str(f.get("value", ""))
+        contrib = f.get("contribution", 0.0)
+        if src == "threat_table":
+            m = re.search(r"score=([0-9\.]+)", val_str)
+            t_score = float(m.group(1)) if m else (contrib / 0.70 if contrib else 0.0)
+        elif src == "weather":
+            m = re.search(r"weather_score=([0-9\.]+)", val_str)
+            w_score = float(m.group(1)) if m else (contrib / 0.20 if contrib else 0.0)
+        elif src == "history":
+            m = re.search(r"history_score=([0-9\.\-]+)", val_str)
+            h_score = float(m.group(1)) if m else (contrib / 0.10 if contrib else 0.0)
+
+    w_obj = data.get("weather") or {}
+    w_loc = w_obj.get("location_name", "None")
+    w_src = w_obj.get("data_source", "None")
+    if w_score == 0.0 and "weather_score" in w_obj:
+        w_score = float(w_obj.get("weather_score", 0.0))
+
+    r_recomputed = round(0.70 * t_score + 0.20 * w_score + 0.10 * h_score, 4)
+    r_match = abs(float(r_api) - r_recomputed) < 1e-4
+
+    return {
+        "t": t_score,
+        "w": w_score,
+        "h": h_score,
+        "r_api": float(r_api),
+        "r_recomputed": r_recomputed,
+        "r_match": r_match,
+        "w_loc": w_loc,
+        "w_src": w_src,
+    }
 
 
 def compact_json_summary(data: Dict[str, Any]) -> str:
@@ -58,6 +105,15 @@ def compact_json_summary(data: Dict[str, Any]) -> str:
         f"Warnings: {warnings if warnings else 'None'}",
         f"Severity: {data.get('severity_pct')} (Invariant: strictly null)",
     ]
+    bk = extract_risk_breakdown(data)
+    if bk:
+        lines.append(f"R Formula: 0.70*({bk['t']:.2f}) + 0.20*({bk['w']:.2f}) + 0.10*({bk['h']:.2f}) = {bk['r_recomputed']:.4f}")
+    mon = data.get("monitoring")
+    if mon:
+        lines.append(f"Follow-up visit: {mon.get('visit_number')}")
+        lines.append(f"Disease Status: {mon.get('disease_status')}")
+        lines.append(f"Confidence Delta: {mon.get('confidence_raw_delta')}")
+        lines.append(f"Same Image: {mon.get('same_image_flag')}")
     return " | ".join(lines)
 
 
@@ -171,6 +227,17 @@ def run_smoke():
                     resp_json = resp.json()
                     if idx == 1 and resp.status_code == 200:
                         saved_case_id = resp_json.get("case_id")
+                    if resp.status_code == 200:
+                        bk = extract_risk_breakdown(resp_json)
+                        if bk:
+                            print(
+                                f"  Risk Breakdown:\n"
+                                f"    T (Threat)   = {bk['t']:.2f}\n"
+                                f"    W (Weather)  = {bk['w']:.2f} (source: {bk['w_src']}, location: {bk['w_loc']})\n"
+                                f"    H (History)  = {bk['h']:.2f}\n"
+                                f"    Formula: R = 0.70*T + 0.20*W + 0.10*H = 0.70*{bk['t']:.2f} + 0.20*{bk['w']:.2f} + 0.10*{bk['h']:.2f} = {bk['r_recomputed']:.4f}\n"
+                                f"    API Risk Score = {bk['r_api']:.4f} (Matches recomputed: {bk['r_match']})"
+                            )
                     summary_str = compact_json_summary(resp_json)
                     print(f"Summary: {summary_str}\n")
                 except Exception as e:

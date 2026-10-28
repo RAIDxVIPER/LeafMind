@@ -116,15 +116,15 @@ def validate_and_sanitize_image(
     try:
         img = Image.open(io.BytesIO(raw_bytes))
         img.load()  # Force load pixel data to verify image integrity
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "Could not decode image file. Please provide a valid, uncorrupted "
-                "JPEG, PNG, or WebP photo of a crop leaf. Capture tip: Take photos in "
-                "bright, indirect daylight and hold camera steady."
+                "Uploaded file is not a valid or readable image. Please provide a clear, "
+                "uncorrupted JPEG, PNG, or WebP photo of a crop leaf. Capture tip: Take photos "
+                "in bright, indirect daylight and hold your camera steady."
             ),
-        ) from exc
+        ) from None
 
     # 3. Format check
     fmt = (img.format or "").upper()

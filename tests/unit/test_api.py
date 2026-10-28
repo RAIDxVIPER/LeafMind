@@ -271,7 +271,7 @@ def test_invalid_image_text_renamed_jpg(client: TestClient):
     resp = client.post("/analyze", files=files, data=data)
     assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     detail = resp.json()["detail"]
-    assert "could not decode image file" in detail.lower()
+    assert "not a valid or readable image" in detail.lower()
     assert "capture tip" in detail.lower()
 
 
@@ -823,4 +823,192 @@ def test_serialization_failure_guard_returns_clean_500(client: TestClient):
         assert "invalid utf-8" not in body["detail"]
         assert "pydantic" not in body["detail"].lower()
         assert "traceback" not in body["detail"].lower()
+
+
+def test_monitoring_disease_status_is_always_one_of_5_spec_labels_and_neutral(client: TestClient):
+    """
+    Assert that monitoring disease_status returned in API response is always
+    strictly one of the 5 allowed spec labels (D4, I21):
+      - same_disease_still_detected
+      - no_disease_detected_at_followup
+      - different_disease_detected_at_followup
+      - not_applicable_healthy_baseline
+      - unknown
+    And assert that no text contains 'recover', 'improv', or 'worsen' derived from monitoring.
+    """
+    from src.api.formatting import MONITORING_STATUS_NEUTRAL_LABELS, format_monitoring_status
+
+    allowed_5_labels = {
+        "same_disease_still_detected",
+        "no_disease_detected_at_followup",
+        "different_disease_detected_at_followup",
+        "not_applicable_healthy_baseline",
+        "unknown",
+    }
+
+    # Verify dictionary has exact 5 labels
+    assert set(MONITORING_STATUS_NEUTRAL_LABELS.keys()) == allowed_5_labels
+
+    for label in allowed_5_labels:
+        desc = format_monitoring_status(label).lower()
+        assert "recover" not in desc
+        assert "improv" not in desc
+        assert "worsen" not in desc
+
+    # Run real follow-up case through API
+    real_img_path = Path("Dataset_2/Test_ID/Tomato___Early_blight")
+    real_file = next(real_img_path.glob("*.JPG"), None)
+    assert real_file is not None
+
+    with open(real_file, "rb") as f:
+        real_bytes = f.read()
+
+    resp_base = client.post(
+        "/analyze",
+        files={"image": ("base.jpg", real_bytes, "image/jpeg")},
+        data={"crop": "Tomato"},
+    )
+    assert resp_base.status_code == status.HTTP_200_OK
+    base_case_id = resp_base.json()["case_id"]
+
+    resp_fu = client.post(
+        "/analyze",
+        files={"image": ("followup.jpg", real_bytes, "image/jpeg")},
+        data={"crop": "Tomato", "previous_case_id": base_case_id},
+    )
+    assert resp_fu.status_code == status.HTTP_200_OK
+    fu_json = resp_fu.json()
+
+    assert fu_json.get("is_followup") is True
+    mon = fu_json.get("monitoring")
+    assert mon is not None
+    assert mon.get("disease_status") in allowed_5_labels
+    # Since identical image was passed, same_image_flag must be True and status must be unknown
+    assert mon.get("same_image_flag") is True
+    assert mon.get("disease_status") == "unknown"
+
+    # Recursive check: no field in the entire JSON contains recover, improv, worsen from monitoring
+    def _check_no_forbidden_monitoring_words(obj: Any):
+        if isinstance(obj, str):
+            s = obj.lower()
+            # General check that monitoring status does not imply recovery / improvement / worsening
+            if "status" in s or "trajectory" in s or "delta" in s:
+                assert "recover" not in s
+                assert "improv" not in s
+                assert "worsen" not in s
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in ("disease_status", "status", "trajectory"):
+                    assert str(v).lower() not in ("recovering", "improving", "worsening")
+                _check_no_forbidden_monitoring_words(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _check_no_forbidden_monitoring_words(item)
+
+    _check_no_forbidden_monitoring_words(fu_json)
+
+
+def test_422_detail_strings_contain_no_python_internals_or_paths(client: TestClient):
+    """
+    Test that all 422 error details contain NO Python internals:
+      - No BytesIO
+      - No Traceback
+      - No PIL
+      - No Errno
+      - No system file paths (e.g. C:\\, /Users, /home, /tmp, .py)
+    And provide clear farmer-friendly messages with capture tips where appropriate.
+    """
+    import re
+    path_regex = re.compile(r"(?:[a-zA-Z]:\\[^ \n]+|/(?:Users|home|tmp|var|usr)/[^ \n]+|\.py\b)", re.IGNORECASE)
+
+    test_payloads = [
+        # (title, files, data)
+        ("Text renamed jpg", {"image": ("test.jpg", b"Plain text not an image", "image/jpeg")}, {"crop": "Tomato"}),
+        ("Corrupt header", {"image": ("corrupt.jpg", b"\xff\xd8\xff\xe0\x00\x10JFIF\x00CORRUPT", "image/jpeg")}, {"crop": "Tomato"}),
+        ("Tiny dimensions", {"image": ("tiny.jpg", create_test_image_bytes(32, 32), "image/jpeg")}, {"crop": "Tomato"}),
+        ("Oversize file", {"image": ("huge.jpg", b"0" * (11 * 1024 * 1024), "image/jpeg")}, {"crop": "Tomato"}),
+        ("Empty image", {"image": ("empty.jpg", b"", "image/jpeg")}, {"crop": "Tomato"}),
+        ("Unknown crop", {"image": ("leaf.jpg", create_test_image_bytes(), "image/jpeg")}, {"crop": "Papaya"}),
+        ("Empty crop", {"image": ("leaf.jpg", create_test_image_bytes(), "image/jpeg")}, {"crop": "   "}),
+    ]
+
+    for title, files, data in test_payloads:
+        resp = client.post("/analyze", files=files, data=data)
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY, f"Failed on {title}"
+        detail = resp.json().get("detail", "")
+        assert isinstance(detail, str), f"Detail is not string on {title}"
+        assert len(detail) > 0, f"Detail is empty on {title}"
+
+        # Assert no internals
+        assert "bytesio" not in detail.lower(), f"Leaked BytesIO in {title}: {detail}"
+        assert "traceback" not in detail.lower(), f"Leaked Traceback in {title}: {detail}"
+        assert "pil" not in detail.lower(), f"Leaked PIL in {title}: {detail}"
+        assert "errno" not in detail.lower(), f"Leaked Errno in {title}: {detail}"
+        assert not path_regex.search(detail), f"Leaked path in {title}: {detail}"
+
+
+def test_escalation_banner_farmer_reasons():
+    """
+    Verify that the escalation banner maps triggered trigger codes
+    to clear farmer-friendly language for at least SAME_IMAGE, SINGLE_CLASS_CROP,
+    T1, T4, and T7 (and combinations).
+    """
+    from src.api.formatting import build_display_fields, TRIGGER_FARMER_DESCRIPTIONS
+    from src.orchestrator.state import EscalationSummary, FinalResponse, VisionSummary
+
+    def _make_final(triggers: list, priority: str = "medium", is_single: bool = False):
+        vis = VisionSummary(
+            top_label="Tomato___Early_blight",
+            confidence=0.50,
+            can_diagnose=not is_single,
+            single_class_crop=is_single,
+        )
+        esc = EscalationSummary(
+            escalate_to_human=True,
+            priority=priority,
+            triggered_triggers=triggers,
+            reasons=[],
+        )
+        return FinalResponse(
+            case_id=uuid.uuid4(),
+            farmer_id="farmer_1",
+            submitted_at=datetime.now(timezone.utc),
+            crop="Squash" if is_single else "Tomato",
+            vision=vis,
+            escalation=esc,
+        )
+
+    # 1. SAME_IMAGE
+    f_same = _make_final(["SAME_IMAGE"], priority="medium")
+    disp_same = build_display_fields(f_same)
+    assert "this photo is identical to your earlier photo" in disp_same["escalation_banner"]
+
+    # 2. SINGLE_CLASS_CROP
+    f_single = _make_final(["SINGLE_CLASS_CROP"], priority="high", is_single=True)
+    disp_single = build_display_fields(f_single)
+    assert "this crop can't be diagnosed from a photo" in disp_single["escalation_banner"]
+    assert "(priority: high)" in disp_single["escalation_banner"]
+
+    # 3. T1
+    f_t1 = _make_final(["T1"], priority="medium")
+    disp_t1 = build_display_fields(f_t1)
+    assert "the model is not confident" in disp_t1["escalation_banner"]
+
+    # 4. T4
+    f_t4 = _make_final(["T4"], priority="medium")
+    disp_t4 = build_display_fields(f_t4)
+    assert "the photo is blurry" in disp_t4["escalation_banner"]
+
+    # 5. T7
+    f_t7 = _make_final(["T7"], priority="high")
+    disp_t7 = build_display_fields(f_t7)
+    assert "severe disease risk" in disp_t7["escalation_banner"]
+
+    # 6. Combined reasons (e.g. SINGLE_CLASS_CROP and T6)
+    f_combo = _make_final(["SINGLE_CLASS_CROP", "T6"], priority="high", is_single=True)
+    disp_combo = build_display_fields(f_combo)
+    banner = disp_combo["escalation_banner"]
+    assert "this crop can't be diagnosed from a photo" in banner
+    assert "management guidance is limited for this crop or disease" in banner
+    assert ";" in banner
 

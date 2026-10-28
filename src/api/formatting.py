@@ -35,6 +35,41 @@ FARMER_CAPTURE_TIPS = [
     "Avoid extreme close-ups that obscure leaf shape, and avoid distant shots of the whole plant.",
 ]
 
+# Neutral, non-efficacy wording for follow-up monitoring statuses (D4, I21).
+# Strictly avoids implying clinical improvement or worsening from classifier confidence.
+MONITORING_STATUS_NEUTRAL_LABELS: Dict[str, str] = {
+    "same_disease_still_detected": "the same disease was detected again",
+    "no_disease_detected_at_followup": "no disease was detected this time",
+    "different_disease_detected_at_followup": "a different disease was detected",
+    "not_applicable_healthy_baseline": "not applicable (healthy baseline)",
+    "unknown": "comparison not possible",
+}
+
+# Farmer-facing plain language descriptions for triggered escalation triggers
+TRIGGER_FARMER_DESCRIPTIONS: Dict[str, str] = {
+    "SAME_IMAGE": "this photo is identical to your earlier photo",
+    "SINGLE_CLASS_CROP": "this crop can't be diagnosed from a photo",
+    "T1": "the model is not confident",
+    "T2": "the model is torn between two similar diseases",
+    "T3": "the photo resolution is low",
+    "T4": "the photo is blurry",
+    "T5": "the photo looks very different from typical leaves",
+    "T6": "management guidance is limited for this crop or disease",
+    "T7": "severe disease risk",
+    "T8": "a different disease was detected at follow-up",
+    "T9": "disease has persisted across multiple visits",
+    "T10": "follow-up photo quality is degraded",
+    "T11": "crop does not match your earlier photo",
+    "VISION_UNCERTAIN": "the visual diagnosis is uncertain",
+}
+
+
+def format_monitoring_status(status: Optional[str]) -> str:
+    """Format monitoring disease status into strictly neutral, farmer-facing wording."""
+    if not status:
+        return "comparison not possible"
+    return MONITORING_STATUS_NEUTRAL_LABELS.get(status, "comparison not possible")
+
 
 def clean_farmer_text(text: Optional[str]) -> str:
     """Strip internal tags like (T2), (VER), (CAR1) and normalize whitespace."""
@@ -129,10 +164,23 @@ def build_display_fields(
     escalation_banner: Optional[str] = None
     if esc and esc.escalate_to_human:
         prio_text = f" (priority: {esc.priority})" if esc.priority != "medium" else ""
-        escalation_banner = (
-            f"Agronomist review recommended{prio_text}: Automated analysis flagged high uncertainty or "
-            "severe risk. Please verify this advisory with a local agricultural expert."
-        )
+        farmer_reasons: List[str] = []
+        for trig in getattr(esc, "triggered_triggers", []):
+            desc = TRIGGER_FARMER_DESCRIPTIONS.get(trig)
+            if desc and desc not in farmer_reasons:
+                farmer_reasons.append(desc)
+
+        if farmer_reasons:
+            reasons_clause = "; ".join(farmer_reasons)
+            escalation_banner = (
+                f"Agronomist review recommended{prio_text}: {reasons_clause}. "
+                "Please verify this advisory with a local agricultural expert."
+            )
+        else:
+            escalation_banner = (
+                f"Agronomist review recommended{prio_text}: Automated analysis flagged uncertainty or "
+                "elevated risk. Please verify this advisory with a local agricultural expert."
+            )
 
     return {
         "farmer_summary": farmer_summary,
