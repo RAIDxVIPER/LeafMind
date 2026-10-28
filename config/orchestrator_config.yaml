@@ -1,0 +1,23 @@
+# =============================================================================
+# LeafMind — Orchestration and Escalation Configuration (Stage C7)
+# =============================================================================
+# Centralized configuration for graph timeouts, persistence, and escalation
+# thresholds (I42: single point of control for ood_flag and escalation triggers).
+
+escalation:
+  confidence_threshold: 0.60     # T1: vision.confidence < threshold [ENG assumption]
+  prob_gap_threshold: 0.15       # T2: (top1.prob - top2.prob) < threshold [ENG assumption]
+  ood_threshold: 0.40            # T5: vision.confidence < threshold (or ood_flag) [ENG assumption]
+  persistence_visit_threshold: 2  # T9: visit >= threshold for same disease persistence [ENG]
+  extended_visit_threshold: 3    # T9: visit >= threshold for urgent priority [ENG]
+
+persistence:
+  sqlite_db_path: "data/checkpoints.db"   # Local SQLite database for LangGraph checkpoints (gitignored)
+  case_store_dir: "data/cases"           # Directory for individual case JSON records (gitignored)
+
+timeouts:
+  vision_timeout_seconds: 15.0
+  weather_timeout_seconds: 10.0
+  rag_timeout_seconds: 10.0
+  recommendation_timeout_seconds: 30.0
+  pipeline_timeout_seconds: 60.0

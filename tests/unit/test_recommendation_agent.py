@@ -783,3 +783,62 @@ class TestC6Hardening:
         assert "RAG_CHAPTER_NOT_FOUND" in rec_squash.flags
         assert "HEALTHY_CLASS" not in rec_squash.flags
         assert rec_squash.urgency == "consult_agronomist"
+
+    def test_timing_and_application_claims_rejected_unless_grounded(self):
+        """Timing claims like 'early in the morning', 'after rain', 'before flowering' must be rejected unless in input."""
+        # Case A: ungrounded 'early in the morning' is rejected
+        hallucinated_timing = json.dumps({
+            "summary": "Late blight detected.",
+            "what_to_do_first": "Apply copper fungicides early in the morning when conditions favor spread.",
+            "steps": ["Apply early in the morning."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        agent_bad = RecommendationAgent(provider=MockLLMProvider(handler=hallucinated_timing))
+        rec_bad = agent_bad.recommend(
+            vision=make_vision(),
+            rag=make_rag(what_to_do_first="Proper field drainage and plant spacing."),
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+        assert rec_bad.llm_used is False
+        assert rec_bad.fallback_reason is not None
+        assert "ungrounded_timing_claim" in rec_bad.fallback_reason or "validation_failed" in rec_bad.fallback_reason
+
+        # Case B: grounded timing claim is accepted
+        grounded_timing = json.dumps({
+            "summary": "Late blight detected.",
+            "what_to_do_first": "Spray early in the morning as recommended.",
+            "steps": ["1. Spray early in the morning."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        agent_good = RecommendationAgent(provider=MockLLMProvider(handler=grounded_timing))
+        rec_good = agent_good.recommend(
+            vision=make_vision(),
+            rag=make_rag(what_to_do_first="Spray early in the morning to limit evaporation."),
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+        assert rec_good.llm_used is True
+        assert rec_good.fallback_reason is None
+
+    def test_ungrounded_chemical_rejected_unless_grounded(self):
+        """Named chemical product like 'chlorothalonil' must be rejected if absent from input."""
+        hallucinated_chem = json.dumps({
+            "summary": "Late blight detected.",
+            "what_to_do_first": "Apply chlorothalonil immediately.",
+            "steps": ["Apply chlorothalonil."],
+            "weather_note": None,
+            "uncertainty_note": None,
+        })
+        agent = RecommendationAgent(provider=MockLLMProvider(handler=hallucinated_chem))
+        rec = agent.recommend(
+            vision=make_vision(),
+            rag=make_rag(what_to_do_first="Remove infected leaves and sanitize tools."),
+            weather=make_weather(),
+            risk=make_risk(),
+        )
+        assert rec.llm_used is False
+        assert "ungrounded_product" in rec.fallback_reason or "validation_failed" in rec.fallback_reason
+

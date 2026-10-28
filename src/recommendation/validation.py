@@ -37,6 +37,39 @@ RE_INTERVAL = re.compile(
     re.IGNORECASE,
 )
 
+# Regex for application and timing claims (e.g. 'early in the morning', 'after rain', 'before flowering')
+RE_APPLICATION_TIMING = re.compile(
+    r"\b(?:"
+    r"early\s+in\s+the\s+morning|"
+    r"in\s+the\s+(?:early\s+)?morning|"
+    r"in\s+the\s+(?:late\s+)?evening|"
+    r"late\s+(?:in\s+the\s+)?evening|"
+    r"during\s+the\s+day|"
+    r"midday|"
+    r"at\s+dusk|"
+    r"at\s+dawn|"
+    r"(?:before|after|during)\s+(?:heavy\s+)?rain(?:fall)?|"
+    r"(?:before|after|during|at)\s+flowering|"
+    r"(?:before|after|during)\s+harvest(?:ing)?|"
+    r"(?:before|after|during)\s+bud\s+break|"
+    r"(?:before|after|during)\s+fruit\s+set"
+    r")\b",
+    re.IGNORECASE,
+)
+
+ADDITIONAL_ACTIVES = [
+    "fosetyl-al", "iprodione", "pyraclostrobin", "boscalid", "cyprodinil",
+    "fludioxonil", "propamocarb", "fluopicolide", "mandipropamid", "ametoctradin",
+    "kresoxim-methyl", "zoxamide", "thiram", "zineb", "benomyl", "carbofuran",
+    "imidacloprid", "chlorpyrifos", "abamectin", "spinosad", "neem oil", "neem cake",
+]
+
+# Pattern for chemical active suffix families (-azole, -strobin, -morph, -oxanil, -mycin, -cycline)
+RE_CHEMICAL_SUFFIX = re.compile(
+    r"\b(?!(?:outside|inside|provide|decide|subside|stride|divide|guide)\b)[a-z]{4,}(?:azole|strobin|morph|oxanil|mide|mycin|cycline|conazole)\b",
+    re.IGNORECASE,
+)
+
 
 def extract_numbers(text: str) -> Set[str]:
     """Extract normalized set of numeric tokens from text."""
@@ -71,11 +104,13 @@ def extract_products(text: str) -> Set[str]:
         return set()
     found = set()
     text_lower = text.lower()
-    for active in BROAD_ACTIVES:
+    for active in list(BROAD_ACTIVES) + ADDITIONAL_ACTIVES:
         # Match whole word
         pattern = r"\b" + re.escape(active.lower()) + r"\b"
         if re.search(pattern, text_lower):
             found.add(active.lower())
+    for match in RE_CHEMICAL_SUFFIX.finditer(text_lower):
+        found.add(match.group(0).lower())
     return found
 
 
@@ -177,7 +212,20 @@ def validate_grounding(
                     None,
                 )
 
-    # 4. Check for ungrounded numbers (only allowed if in input text or step index)
+    # 4. Check for ungrounded application timing claims (e.g. 'early in the morning', 'after rain', 'before flowering')
+    timing_matches = RE_APPLICATION_TIMING.findall(combined_output)
+    if timing_matches:
+        input_lower = input_prompt.lower().replace("_", " ")
+        for phrase in timing_matches:
+            clean_phrase = phrase.strip().lower()
+            if clean_phrase and clean_phrase not in input_lower:
+                return (
+                    False,
+                    f"ungrounded_timing_claim: '{phrase}' not in input",
+                    None,
+                )
+
+    # 5. Check for ungrounded numbers (only allowed if in input text or step index)
     output_numbers = extract_numbers(combined_output)
     input_numbers = extract_numbers(input_prompt)
 
