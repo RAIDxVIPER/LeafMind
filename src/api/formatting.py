@@ -7,8 +7,11 @@ without modifying internal citations or agent outputs.
 """
 from __future__ import annotations
 
+from datetime import date, datetime
+import hashlib
 import re
 from typing import Any, Dict, List, Optional
+import uuid
 from src.orchestrator.state import FinalResponse
 from src.schemas.schemas import ClassProb
 
@@ -141,3 +144,75 @@ def build_display_fields(
         "disclaimers": list(STANDARD_DISCLAIMERS),
         "escalation_banner": escalation_banner,
     }
+
+
+# =============================================================================
+# API Safe Image Stub & Payload Sanitization
+# =============================================================================
+
+RE_BASE64_HEURISTIC = re.compile(r"^[A-Za-z0-9+/=\r\n]+$")
+
+
+def build_safe_image_stub(image_data: Any) -> Dict[str, Any]:
+    """
+    Produce a safe metadata stub replacing raw binary image bytes.
+    Ensures no raw bytes or large base64 strings ever leak into API responses.
+    """
+    if not image_data:
+        return {"image_included": False, "image_sha256": None, "size_bytes": 0}
+    if isinstance(image_data, bytes):
+        sha = hashlib.sha256(image_data).hexdigest()
+        return {"image_included": False, "image_sha256": sha, "size_bytes": len(image_data)}
+    if isinstance(image_data, str):
+        # Could be base64 string or placeholder
+        sha = hashlib.sha256(image_data.encode("utf-8")).hexdigest()
+        return {"image_included": False, "image_sha256": sha, "size_bytes": len(image_data)}
+    if isinstance(image_data, dict):
+        return {
+            "image_included": bool(image_data.get("image_included", False)),
+            "image_sha256": image_data.get("image_sha256"),
+            "size_bytes": int(image_data.get("size_bytes", 0)),
+        }
+    return {"image_included": False, "image_sha256": None, "size_bytes": 0}
+
+
+def is_large_base64_blob(val: str, min_len: int = 500) -> bool:
+    """Detect if a string is a long base64 blob that should not be in the API response."""
+    if len(val) >= min_len and RE_BASE64_HEURISTIC.match(val[:300]):
+        return True
+    return False
+
+
+def sanitize_for_api(obj: Any) -> Any:
+    """
+    Recursively sanitize any Python object / dictionary so that:
+      - No raw `bytes` exist anywhere in the object (converted to safe stub).
+      - No large base64 data strings exist (replaced with safe stub).
+      - All datetimes, UUIDs, and numbers are strictly JSON-serializable.
+    """
+    if obj is None:
+        return None
+    if isinstance(obj, bytes):
+        return build_safe_image_stub(obj)
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+    if isinstance(obj, str):
+        if is_large_base64_blob(obj):
+            return build_safe_image_stub(obj)
+        return obj
+    if isinstance(obj, dict):
+        cleaned: Dict[str, Any] = {}
+        for k, v in obj.items():
+            if k in ("image_bytes", "followup_image_bytes"):
+                cleaned[k] = build_safe_image_stub(v)
+            else:
+                cleaned[k] = sanitize_for_api(v)
+        return cleaned
+    if isinstance(obj, (list, tuple, set)):
+        return [sanitize_for_api(x) for x in obj]
+    if hasattr(obj, "model_dump"):
+        return sanitize_for_api(obj.model_dump(mode="python"))
+    return obj
+

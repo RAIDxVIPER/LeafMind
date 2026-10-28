@@ -140,3 +140,79 @@ def test_streamlit_app_displays_results_and_escalation(mock_meta_data, mock_anal
         # Verify severity_pct is strictly None
         assert mock_analysis_result["severity_pct"] is None
         assert "severity percentage is not measured" in all_app_text.lower()
+
+
+def test_streamlit_app_handles_escalated_safe_stub_response(mock_meta_data, mock_analysis_result):
+    """
+    Verify AppTest handles an escalated response where escalation.payload contains
+    SafeImageStub (image_included=False, image_sha256, size_bytes).
+    Ensures zero exceptions and proper warning banner.
+    """
+    escalated_data = dict(mock_analysis_result)
+    escalated_data["crop"] = "Squash"
+    escalated_data["escalation"] = {
+        "escalate_to_human": True,
+        "priority": "high",
+        "triggered_triggers": ["T6_SINGLE_CLASS_CROP"],
+        "reasons": [{"trigger_id": "T6", "description": "Single class crop"}],
+        "payload": {
+            "case_id": "4a28f891-944a-4a4f-9e79-5098ef6c3b99",
+            "farmer_id": "farmer_001",
+            "escalation_reason": ["Single class crop"],
+            "image_bytes": {
+                "image_included": False,
+                "image_sha256": "abcdef1234567890abcdef1234567890",
+                "size_bytes": 20480,
+            },
+            "escalated_at": "2026-10-28T12:00:00Z",
+            "priority": "high",
+        },
+    }
+
+    with patch("streamlit_app.app.fetch_health", return_value={"status": "ok", "version": "0.1.0"}), \
+         patch("streamlit_app.app.fetch_meta", return_value=mock_meta_data):
+
+        at = AppTest.from_file("streamlit_app/app.py")
+        at.session_state["current_analysis"] = escalated_data
+        at.run(timeout=10)
+
+        assert len(at.exception) == 0
+        warning_texts = " ".join([str(w.value) for w in at.warning])
+        assert "agronomist review recommended" in warning_texts.lower()
+
+
+def test_streamlit_app_handles_followup_monitoring_response(mock_meta_data, mock_analysis_result):
+    """
+    Verify AppTest handles a follow-up response with monitoring trajectory delta cleanly.
+    """
+    followup_data = dict(mock_analysis_result)
+    followup_data["is_followup"] = True
+    followup_data["previous_case_id"] = "11111111-2222-3333-4444-555555555555"
+    followup_data["monitoring"] = {
+        "case_id": "4a28f891-944a-4a4f-9e79-5098ef6c3b99",
+        "visit_number": 2,
+        "baseline_label": "Tomato___Early_blight",
+        "baseline_confidence": 0.82,
+        "followup_label": "Tomato___Early_blight",
+        "followup_confidence": 0.75,
+        "label_same": True,
+        "disease_still_detected": True,
+        "new_label_is_healthy": False,
+        "confidence_raw_delta": -0.07,
+        "disease_status": "same_disease_still_detected",
+        "same_image_flag": False,
+        "poor_quality_flag": False,
+        "crop_mismatch_flag": False,
+        "too_soon_flag": False,
+        "escalate_to_human": False,
+    }
+
+    with patch("streamlit_app.app.fetch_health", return_value={"status": "ok", "version": "0.1.0"}), \
+         patch("streamlit_app.app.fetch_meta", return_value=mock_meta_data):
+
+        at = AppTest.from_file("streamlit_app/app.py")
+        at.session_state["current_analysis"] = followup_data
+        at.run(timeout=10)
+
+        assert len(at.exception) == 0
+

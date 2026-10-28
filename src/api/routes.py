@@ -24,6 +24,8 @@ from src.api.formatting import (
     FARMER_CAPTURE_TIPS,
     STANDARD_DISCLAIMERS,
     build_display_fields,
+    build_safe_image_stub,
+    sanitize_for_api,
 )
 from src.api.schemas import (
     AnalyzeResponse,
@@ -131,6 +133,7 @@ async def analyze_leaf(
             location=loc_param,
             include_doses=include_doses,
             previous_case_id=previous_case_id,
+            use_memory=True,
         )
 
     loop = asyncio.get_running_loop()
@@ -167,8 +170,16 @@ async def analyze_leaf(
     ]
 
     # Combine FinalResponse model fields with display fields
-    resp_dict = final_resp.model_dump()
-    resp_dict.update({
+    raw_resp_dict = final_resp.model_dump(mode="python")
+
+    # Sanitize escalation payload to ensure no raw bytes reach the response
+    if raw_resp_dict.get("escalation") and isinstance(raw_resp_dict["escalation"], dict):
+        esc_dict = raw_resp_dict["escalation"]
+        if esc_dict.get("payload") and isinstance(esc_dict["payload"], dict):
+            payload_dict = esc_dict["payload"]
+            payload_dict["image_bytes"] = build_safe_image_stub(payload_dict.get("image_bytes"))
+
+    raw_resp_dict.update({
         "farmer_summary": display_fields["farmer_summary"],
         "top3": top3_items,
         "risk_label": display_fields["risk_label"],
@@ -179,12 +190,24 @@ async def analyze_leaf(
         "escalation_banner": display_fields["escalation_banner"],
     })
 
-    return AnalyzeResponse(**resp_dict)
+    try:
+        response_model = AnalyzeResponse(**raw_resp_dict)
+        # Pre-verify that response serializes to JSON cleanly without error
+        _ = response_model.model_dump(mode="json")
+    except Exception as exc:
+        sanitized = sanitize_error(exc)
+        logger.error("AnalyzeResponse serialization failure: %s", sanitized)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to serialize analysis response.",
+        ) from exc
+
+    return response_model
 
 
 @router.get("/case/{case_id}")
 async def get_case(case_id: str) -> Dict[str, Any]:
-    """Retrieve persisted case record by case_id."""
+    """Retrieve persisted case record by case_id safely without raw bytes."""
     clean_id = case_id.strip()
     try:
         case_uuid = uuid.UUID(clean_id)
@@ -194,21 +217,37 @@ async def get_case(case_id: str) -> Dict[str, Any]:
             detail=f"Case '{case_id}' not found.",
         )
 
-    # Attempt to load case record from store
-    case_record = load_case_record(case_uuid)
-    if case_record is not None:
-        # Return serialized record, avoiding raw image bytes in response
-        data = case_record.model_dump(mode="json")
-        if "initial_request" in data and "image_bytes" in data["initial_request"]:
-            data["initial_request"]["image_bytes"] = None
-        return data
+    try:
+        # Attempt to load case record from store
+        case_record = load_case_record(case_uuid)
+        if case_record is not None:
+            raw_data = case_record.model_dump(mode="python")
+            safe_data = sanitize_for_api(raw_data)
+            # Ensure JSON-serializable
+            import json
+            _ = json.dumps(safe_data)
+            return safe_data
 
-    # Attempt to load final response if case record was not found
-    final_resp = load_final_response(case_uuid)
-    if final_resp is not None:
-        return final_resp.model_dump(mode="json")
+        # Attempt to load final response if case record was not found
+        final_resp = load_final_response(case_uuid)
+        if final_resp is not None:
+            raw_data = final_resp.model_dump(mode="python")
+            safe_data = sanitize_for_api(raw_data)
+            import json
+            _ = json.dumps(safe_data)
+            return safe_data
+    except HTTPException:
+        raise
+    except Exception as exc:
+        sanitized = sanitize_error(exc)
+        logger.error("Error retrieving case %s: %s", clean_id, sanitized)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to retrieve case record.",
+        ) from exc
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Case '{case_id}' not found.",
     )
+

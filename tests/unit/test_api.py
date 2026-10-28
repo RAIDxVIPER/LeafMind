@@ -22,15 +22,18 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import hashlib
 import io
+import json
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
 import uuid
 
 from fastapi import status
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageFilter
 import pytest
 
 from src.api.app import app, create_app
@@ -580,3 +583,244 @@ def test_analyze_timeout_returns_504(client: TestClient):
         resp = client.post("/analyze", files=files, data=data)
         assert resp.status_code == status.HTTP_504_GATEWAY_TIMEOUT
         assert "timed out" in resp.json()["detail"].lower()
+
+
+# =============================================================================
+# 9. Real Image JSON Serialization & Byte Leak Regression Tests (DO Step 4)
+# =============================================================================
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+RE_BASE64_HEURISTIC = re.compile(r"^[A-Za-z0-9+/=\r\n]+$")
+
+
+def assert_no_bytes_and_no_large_base64(data: Any, max_b64_len: int = 1000, path: str = "root") -> None:
+    """
+    Recursively verify that:
+    1. No field in the response is raw bytes.
+    2. No response string is longer than max_b64_len chars of base64-looking data.
+    3. json.dumps succeeds strictly with no default= serializer.
+    """
+    assert not isinstance(data, bytes), f"Found raw bytes at {path}!"
+    if isinstance(data, str):
+        if len(data) >= max_b64_len:
+            sample = data[:300]
+            assert not RE_BASE64_HEURISTIC.match(sample), (
+                f"Field at {path} contains a large base64-like blob (len={len(data)})!"
+            )
+    elif isinstance(data, dict):
+        for k, v in data.items():
+            assert_no_bytes_and_no_large_base64(v, max_b64_len=max_b64_len, path=f"{path}.{k}")
+    elif isinstance(data, (list, tuple)):
+        for i, item in enumerate(data):
+            assert_no_bytes_and_no_large_base64(item, max_b64_len=max_b64_len, path=f"{path}[{i}]")
+
+    # Strictly JSON serializable with standard library json and no default handler
+    if path == "root":
+        try:
+            dumped = json.dumps(data)
+            assert isinstance(dumped, str)
+        except Exception as exc:
+            pytest.fail(f"json.dumps(data) failed with no default=: {exc}")
+
+
+def test_real_jpeg_escalated_single_class_crop(client: TestClient):
+    """
+    Regression test with REAL JPEG bytes:
+    Squash single-class crop triggers escalation (T6) and generates a HumanEscalationPayload.
+    Response must return HTTP 200 with valid JSON, and no raw image bytes or base64 blobs.
+    """
+    squash_path = REPO_ROOT / "Dataset_2" / "Train" / "Squash___Powdery_mildew" / "PV__0056878d-a244-4653-ad56-7e97080c7fd2___UMD_Powd.M 9962.JPG"
+    assert squash_path.is_file(), f"Test image not found at {squash_path}"
+    with open(squash_path, "rb") as f:
+        real_bytes = f.read()
+
+    # Verify real JPEG starts with 0xFF 0xD8 (non-UTF8 sequence)
+    assert real_bytes.startswith(b"\xff\xd8")
+
+    files = {"image": ("squash.jpg", real_bytes, "image/jpeg")}
+    data = {"crop": "Squash"}
+
+    resp = client.post("/analyze", files=files, data=data)
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_json = resp.json()
+    assert_no_bytes_and_no_large_base64(resp_json)
+
+    # Check escalation payload has safe stub instead of raw bytes
+    assert resp_json["escalation"]["escalate_to_human"] is True
+    payload = resp_json["escalation"]["payload"]
+    assert payload is not None
+    assert isinstance(payload["image_bytes"], dict)
+    assert payload["image_bytes"]["image_included"] is False
+    assert payload["image_bytes"]["size_bytes"] > 0
+    assert payload["image_bytes"]["image_sha256"] is not None
+
+
+def test_real_jpeg_healthy_guard_field_ood(client: TestClient):
+    """
+    Regression test with REAL JPEG bytes:
+    Apple scab field OOD photo with crop Apple triggers the healthy-guard and escalation.
+    Response must return HTTP 200 with valid JSON and safe image metadata.
+    """
+    apple_path = REPO_ROOT / "Dataset_2" / "Test_OOD" / "Apple___Apple_scab" / "PD__Apple Scab Leaf (1).jpg"
+    assert apple_path.is_file(), f"Test image not found at {apple_path}"
+    with open(apple_path, "rb") as f:
+        real_bytes = f.read()
+
+    assert real_bytes.startswith(b"\xff\xd8")
+
+    files = {"image": ("apple.jpg", real_bytes, "image/jpeg")}
+    data = {"crop": "Apple"}
+
+    resp = client.post("/analyze", files=files, data=data)
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_json = resp.json()
+    assert_no_bytes_and_no_large_base64(resp_json)
+    assert resp_json["crop"] == "Apple"
+
+
+def test_real_jpeg_followup_case(client: TestClient):
+    """
+    Regression test with REAL JPEG bytes:
+    Follow-up case using previous_case_id comparing against persisted baseline.
+    Response must return HTTP 200 with valid JSON and no raw bytes.
+    """
+    tomato_path = REPO_ROOT / "Dataset_2" / "Test_ID" / "Tomato___Early_blight" / "PV__0034a551-9512-44e5-ba6c-827f85ecc688___RS_Erly.B 9432.JPG"
+    assert tomato_path.is_file(), f"Test image not found at {tomato_path}"
+    with open(tomato_path, "rb") as f:
+        real_bytes = f.read()
+
+    # Step 1: Initial visit
+    resp_base = client.post(
+        "/analyze",
+        files={"image": ("baseline.jpg", real_bytes, "image/jpeg")},
+        data={"crop": "Tomato"},
+    )
+    assert resp_base.status_code == status.HTTP_200_OK
+    base_case_id = resp_base.json()["case_id"]
+
+    # Step 2: Follow-up visit with previous_case_id
+    resp_fu = client.post(
+        "/analyze",
+        files={"image": ("followup.jpg", real_bytes, "image/jpeg")},
+        data={"crop": "Tomato", "previous_case_id": base_case_id},
+    )
+    assert resp_fu.status_code == status.HTTP_200_OK
+
+    fu_json = resp_fu.json()
+    assert_no_bytes_and_no_large_base64(fu_json)
+    assert fu_json["is_followup"] is True
+    assert fu_json["previous_case_id"] == base_case_id
+    assert fu_json["monitoring"] is not None
+
+
+def test_real_jpeg_blurry_image(client: TestClient):
+    """
+    Regression test with REAL JPEG bytes:
+    Blurry image triggering quality flag and escalation T7.
+    Response must return HTTP 200 with valid JSON and warning notices.
+    """
+    tomato_path = REPO_ROOT / "Dataset_2" / "Test_ID" / "Tomato___Early_blight" / "PV__0034a551-9512-44e5-ba6c-827f85ecc688___RS_Erly.B 9432.JPG"
+    with open(tomato_path, "rb") as f:
+        real_bytes = f.read()
+
+    pil_img = Image.open(io.BytesIO(real_bytes))
+    blurry_pil = pil_img.filter(ImageFilter.GaussianBlur(radius=15))
+    buf = io.BytesIO()
+    blurry_pil.save(buf, format="JPEG")
+    blurry_bytes = buf.getvalue()
+
+    resp = client.post(
+        "/analyze",
+        files={"image": ("blurry.jpg", blurry_bytes, "image/jpeg")},
+        data={"crop": "Tomato"},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_json = resp.json()
+    assert_no_bytes_and_no_large_base64(resp_json)
+    warnings = resp_json.get("warnings", [])
+    assert any("blurry" in w.lower() for w in warnings)
+
+
+def test_real_png_image(client: TestClient):
+    """
+    Regression test with REAL PNG bytes:
+    Upload a real PNG formatted image (starts with PNG signature bytes).
+    Response must return HTTP 200 with valid JSON and no raw bytes.
+    """
+    tomato_path = REPO_ROOT / "Dataset_2" / "Test_ID" / "Tomato___Early_blight" / "PV__0034a551-9512-44e5-ba6c-827f85ecc688___RS_Erly.B 9432.JPG"
+    pil_img = Image.open(tomato_path)
+    buf = io.BytesIO()
+    pil_img.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    assert png_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+    resp = client.post(
+        "/analyze",
+        files={"image": ("leaf.png", png_bytes, "image/png")},
+        data={"crop": "Tomato"},
+    )
+    assert resp.status_code == status.HTTP_200_OK
+
+    resp_json = resp.json()
+    assert_no_bytes_and_no_large_base64(resp_json)
+
+
+def test_get_case_safe_from_raw_bytes(client: TestClient):
+    """
+    Regression test for GET /case/{case_id}:
+    Loads persisted case record for an escalated request.
+    Must return HTTP 200 with valid JSON, and no raw image bytes or large base64 strings.
+    """
+    squash_path = REPO_ROOT / "Dataset_2" / "Train" / "Squash___Powdery_mildew" / "PV__0056878d-a244-4653-ad56-7e97080c7fd2___UMD_Powd.M 9962.JPG"
+    with open(squash_path, "rb") as f:
+        real_bytes = f.read()
+
+    resp_post = client.post(
+        "/analyze",
+        files={"image": ("squash.jpg", real_bytes, "image/jpeg")},
+        data={"crop": "Squash"},
+    )
+    assert resp_post.status_code == status.HTTP_200_OK
+    case_id = resp_post.json()["case_id"]
+
+    resp_get = client.get(f"/case/{case_id}")
+    assert resp_get.status_code == status.HTTP_200_OK
+
+    case_json = resp_get.json()
+    assert_no_bytes_and_no_large_base64(case_json)
+    assert case_json["case_id"] == case_id
+    if "initial_request" in case_json and "image_bytes" in case_json["initial_request"]:
+        img_stub = case_json["initial_request"]["image_bytes"]
+        assert isinstance(img_stub, dict)
+        assert img_stub.get("image_included") is False
+
+
+def test_serialization_failure_guard_returns_clean_500(client: TestClient):
+    """
+    Guard test:
+    If response serialization fails inside route, return clean HTTP 500
+    with a generic message and no internals/tracebacks.
+    """
+    from pydantic_core import PydanticSerializationError
+
+    with patch(
+        "src.api.routes.AnalyzeResponse.model_dump",
+        side_effect=PydanticSerializationError("Error serializing to JSON: invalid utf-8 sequence"),
+    ):
+        valid_bytes = create_test_image_bytes()
+        files = {"image": ("leaf.jpg", valid_bytes, "image/jpeg")}
+        data = {"crop": "Tomato"}
+
+        resp = client.post("/analyze", files=files, data=data)
+        assert resp.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        body = resp.json()
+        assert "detail" in body
+        # Must be clean and generic, without leaking invalid utf-8 or internals
+        assert "invalid utf-8" not in body["detail"]
+        assert "pydantic" not in body["detail"].lower()
+        assert "traceback" not in body["detail"].lower()
+

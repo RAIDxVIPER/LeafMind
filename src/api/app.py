@@ -59,14 +59,23 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # 2. Global Exception Handler for Unhandled Errors (No traceback / path leak)
+    # 2. Global Exception Handler for Unhandled Errors (No traceback / path leak / no internals)
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         sanitized = sanitize_error(exc)
-        logger.error("Unhandled API exception on %s: %s", request.url.path, sanitized)
+        exc_name = type(exc).__name__
+        logger.error("Unhandled API exception [%s] on %s: %s", exc_name, request.url.path, sanitized)
+
+        # Clean generic message for serialization failures or unexpected internal errors
+        if "serialize" in sanitized.lower() or "utf-8" in sanitized.lower() or "serialization" in exc_name.lower():
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Internal server error: Response serialization failed."},
+            )
+
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": f"Internal server error: {sanitized}"},
+            content={"detail": "An internal server error occurred while processing the request."},
         )
 
     # 3. Mount Routes

@@ -29,7 +29,7 @@ import httpx
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 API_HOST = "127.0.0.1"
-API_PORT = 8000
+API_PORT = 8005
 BASE_URL = f"http://{API_HOST}:{API_PORT}"
 
 
@@ -79,23 +79,26 @@ def run_smoke():
     print(f"Launching backend server: {' '.join(cmd)}")
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    server_log_path = REPO_ROOT / "scratch" / "uvicorn_smoke.log"
+    server_log_path.parent.mkdir(parents=True, exist_ok=True)
+    server_log_file = open(server_log_path, "w", encoding="utf-8")
     server_proc = subprocess.Popen(
         cmd,
         cwd=str(REPO_ROOT),
         env=env,
-        stdout=subprocess.PIPE,
+        stdout=server_log_file,
         stderr=subprocess.STDOUT,
-        text=True,
     )
 
     try:
-        # Wait for server /health to become available (cold start timeout 40s)
+        # Wait for server /health to become available (cold start timeout 45s)
         ready = False
         t0 = time.time()
         print("Waiting for API service to initialize...")
         while time.time() - t0 < 45.0:
             if server_proc.poll() is not None:
-                out, _ = server_proc.communicate()
+                server_log_file.close()
+                out = server_log_path.read_text(encoding="utf-8", errors="replace")
                 print("Server failed to start:\n", out)
                 sys.exit(1)
             try:
@@ -113,7 +116,7 @@ def run_smoke():
 
         print(f"Backend ready in {time.time() - t0:.1f}s.\n")
 
-        # Define 4 test cases
+        # Define test images
         diseased_img = next(
             (REPO_ROOT / "Dataset_2" / "Test_ID" / "Tomato___Early_blight").glob("*.JPG"),
             None
@@ -126,20 +129,28 @@ def run_smoke():
             (REPO_ROOT / "Dataset_2" / "Test_OOD" / "Tomato___Early_blight").glob("*.jpg"),
             None
         )
+        squash_img = next(
+            (REPO_ROOT / "Dataset_2" / "Train" / "Squash___Powdery_mildew").glob("*.JPG"),
+            None
+        )
 
         dummy_invalid_path = REPO_ROOT / "scratch" / "dummy_invalid.jpg"
         dummy_invalid_path.parent.mkdir(parents=True, exist_ok=True)
         dummy_invalid_path.write_text("This is an invalid plain text payload renamed as jpg.", encoding="utf-8")
 
         test_cases = [
-            ("1. Lab Diseased Image (Tomato Early Blight)", diseased_img, "Tomato", "Nashik, Maharashtra"),
-            ("2. Lab Healthy Image (Tomato Healthy)", healthy_img, "Tomato", None),
-            ("3. Field OOD Image (Tomato Early Blight field photo)", ood_img, "Tomato", "Pune"),
-            ("4. Invalid Non-Image File (text renamed .jpg)", dummy_invalid_path, "Tomato", None),
+            ("1. Lab Diseased Image (Tomato Early Blight)", diseased_img, "Tomato", "Nashik, Maharashtra", False),
+            ("2. Lab Healthy Image (Tomato Healthy)", healthy_img, "Tomato", None, False),
+            ("3. Field OOD Image (Tomato Early Blight field photo)", ood_img, "Tomato", "Pune", False),
+            ("4. Invalid Non-Image File (text renamed .jpg)", dummy_invalid_path, "Tomato", None, False),
+            ("5. Escalated Single-Class Crop (Squash Powdery Mildew)", squash_img, "Squash", None, False),
+            ("6. Follow-up Visit (comparing against baseline visit 1)", diseased_img, "Tomato", None, True),
         ]
 
+        saved_case_id: Optional[str] = None
+
         with httpx.Client(timeout=60.0) as client:
-            for idx, (title, img_path, crop, loc) in enumerate(test_cases, 1):
+            for idx, (title, img_path, crop, loc, is_fu) in enumerate(test_cases, 1):
                 print(f"--- Running Request {idx}: {title} ---")
                 if img_path is None or not img_path.exists():
                     print(f"Skipping: test file {img_path} not found.")
@@ -151,11 +162,15 @@ def run_smoke():
                 data_payload: Dict[str, Any] = {"crop": crop}
                 if loc:
                     data_payload["location"] = loc
+                if is_fu and saved_case_id:
+                    data_payload["previous_case_id"] = saved_case_id
 
                 resp = client.post(f"{BASE_URL}/analyze", files=file_payload, data=data_payload)
                 print(f"HTTP Status: {resp.status_code}")
                 try:
                     resp_json = resp.json()
+                    if idx == 1 and resp.status_code == 200:
+                        saved_case_id = resp_json.get("case_id")
                     summary_str = compact_json_summary(resp_json)
                     print(f"Summary: {summary_str}\n")
                 except Exception as e:
@@ -168,6 +183,10 @@ def run_smoke():
             server_proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             server_proc.kill()
+        try:
+            server_log_file.close()
+        except Exception:
+            pass
         print("Backend server stopped.")
 
     print("\n" + "=" * 60)
