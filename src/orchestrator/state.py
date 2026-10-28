@@ -62,6 +62,12 @@ def sanitize_error(message: Any) -> str:
         r"\1=[REDACTED]",
         text,
     )
+    # Redact absolute file paths (Windows e.g. C:\... or Unix e.g. /home/...)
+    text = re.sub(r"[A-Za-z]:\\[A-Za-z0-9_.\-\\]+", "[REDACTED_PATH]", text)
+    text = re.sub(r"(?:/home|/tmp|/Users|/var)/[A-Za-z0-9_.\-/]+", "[REDACTED_PATH]", text)
+    # Redact env var patterns
+    text = re.sub(r"\b[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD)\b\s*=\s*[^\s,;]+", "[REDACTED_ENV]", text)
+
     # Strip internal file paths and raw traceback lines while preserving error text
     lines = []
     in_tb = False

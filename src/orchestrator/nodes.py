@@ -481,11 +481,17 @@ class OrchestratorNodes:
         ):
             m_status = m_out.disease_status
 
+        # Healthy classes must not get a weather contribution: pass weather_score 0.0 (C5 spec / Task 3b)
+        effective_weather = w_out
+        if v_out is not None and "healthy" in (getattr(v_out, "top_label", "") or "").lower():
+            if w_out is not None:
+                effective_weather = w_out.model_copy(update={"weather_score": 0.0})
+
         try:
             agent = self.get_risk_agent()
             risk_out: RiskOutput = agent.score(
                 vision=v_out,
-                weather=w_out,
+                weather=effective_weather,
                 rag=r_out,
                 monitoring_disease_status=m_status,
             )
@@ -703,6 +709,21 @@ class OrchestratorNodes:
         timings = dict(state.get("node_timings_ms", {}))
         timings["response_builder"] = elapsed
 
+        # Healthy-prediction guard (I40 / Task 3a)
+        flags = list(state.get("flags", []))
+        if v_out is not None and "healthy" in (getattr(v_out, "top_label", "") or "").lower():
+            candidates = v_out.top_3_candidates or v_out.top_k_probs
+            if candidates and len(candidates) > 1:
+                runner_up = candidates[1]
+                ru_label = runner_up.label if hasattr(runner_up, "label") else runner_up.class_name
+                ru_prob = float(runner_up.prob)
+                cfg = load_orchestrator_config(self.config_path)
+                thresh = float(cfg.get("guards", {}).get("healthy_runner_up_threshold", 0.25))
+                if "healthy" not in ru_label.lower() and ru_prob >= thresh:
+                    warning_msg = f"possible missed disease: {ru_label} ({ru_prob:.2f})"
+                    if warning_msg not in flags:
+                        flags.append(warning_msg)
+
         final_resp = FinalResponse(
             case_id=c_uuid,
             farmer_id=f_id,
@@ -721,7 +742,7 @@ class OrchestratorNodes:
             raw_weather=w_out,
             raw_rag=r_out,
             partial_result=partial,
-            flags=state.get("flags", []),
+            flags=flags,
             timing_ms=timings,
             errors=state.get("errors", {}),
             fatal_error=state.get("fatal_error"),

@@ -166,6 +166,22 @@ VECTOR_DB_PATH=vector_db/
 
 ---
 
+## 🚀 Run the App
+
+### 1. Start the FastAPI Backend
+```bash
+python -m uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+```
+Interactive API documentation will be available at `http://127.0.0.1:8000/docs`.
+
+### 2. Start the Streamlit Test UI (in a separate terminal)
+```bash
+streamlit run streamlit_app/app.py
+```
+The test console opens automatically at `http://localhost:8501`.
+
+---
+
 ## 📈 Roadmap & Milestones
 
 - [x] **Part 1:** Domain extraction, architecture verification, and comprehensive dataset leakage audit.
