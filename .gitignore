@@ -52,6 +52,7 @@ conda-env/
 # Model weights and checkpoints
 *.pt
 *.pth
+!checkpoints/run1/*.pth
 *.ckpt
 *.h5
 *.hdf5
@@ -65,7 +66,8 @@ conda-env/
 # Training artifacts
 runs/
 outputs/
-checkpoints/
+checkpoints/*
+!checkpoints/run1/
 logs/
 wandb/
 mlruns/

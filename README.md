@@ -1,3 +1,13 @@
+---
+title: LeafMind API
+emoji: 🍃
+colorFrom: green
+colorTo: emerald
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🍃 LeafMind: Multi-Agent Crop Leaf Disease Detection & Farmer Advisory
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)

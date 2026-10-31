@@ -1,0 +1,28 @@
+.git
+.gitignore
+.env
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Exclude multi-gigabyte training datasets
+Dataset/
+Dataset_2/
+
+# Exclude training checkpoints other than run1
+checkpoints/classifier/
+checkpoints/detector/
+checkpoints/dry/
+checkpoints/dry2/
+checkpoints/run1_eval/
+checkpoints/run2/
+checkpoints/smoke_test/
+
+# Exclude tests, presentations and docs
+tests/
+scratch/
+docs/
+*.pptx
+*.pdf
+
